@@ -48,6 +48,7 @@ const formFields = createResource({
 
 		return fields.map((field) => {
 			if (field.fieldname === "half_day_date") field.hidden = true
+			if (field.fieldname === "custom_half_day_session") field.hidden = true
 
 			if (field.fieldname === "posting_date") field.default = today
 
@@ -228,8 +229,14 @@ function setHalfDayDate(half_day) {
 	const half_day_date = formFields.data.find(
 		(field) => field.fieldname === "half_day_date"
 	)
+	const half_day_session = formFields.data.find(
+		(field) => field.fieldname === "custom_half_day_session"
+	)
 	half_day_date.hidden = !half_day
 	half_day_date.reqd = half_day
+
+	half_day_session.hidden = !half_day
+	half_day_session.reqd = half_day
 
 	if (!half_day) return
 
