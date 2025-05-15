@@ -79,6 +79,9 @@ watch(
 	(half_day) => {
 		const half_day_date = formFields.data.find((field) => field.fieldname === "half_day_date")
 		half_day_date.hidden = !half_day
+		const half_day_session = formFields.data.find((field) => field.fieldname === "custom_half_day_session")
+		half_day_session.hidden = !half_day
+		half_day_session.reqd = half_day
 	}
 )
 
