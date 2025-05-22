@@ -3,6 +3,7 @@
 		<template #body>
 			<div class="flex flex-col items-center my-7 p-4 gap-7">
 				<CheckInPanel />
+				<EmployeesOnLeave />
 				<QuickLinks :items="quickLinks" :title="__('Quick Links')" />
 				<RequestPanel />
 			</div>
@@ -17,6 +18,7 @@ import CheckInPanel from "@/components/CheckInPanel.vue"
 import QuickLinks from "@/components/QuickLinks.vue"
 import BaseLayout from "@/components/BaseLayout.vue"
 import RequestPanel from "@/components/RequestPanel.vue"
+import EmployeesOnLeave from "@/components/EmployeesOnLeave.vue"
 import AttendanceIcon from "@/components/icons/AttendanceIcon.vue"
 import ShiftIcon from "@/components/icons/ShiftIcon.vue"
 import LeaveIcon from "@/components/icons/LeaveIcon.vue"
