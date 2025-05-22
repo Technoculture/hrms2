@@ -5,11 +5,11 @@
 			v-model="activeTab"
 		/>
 		<RequestList v-if="activeTab == 'My Requests'" :items="myRequests" />
-		<RequestList
+		<!-- <RequestList
 			v-else-if="activeTab == 'Team Requests'"
 			:items="teamRequests"
 			:teamRequests="true"
-		/>
+		/> -->
 	</div>
 </template>
 
