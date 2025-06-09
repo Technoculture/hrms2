@@ -24,6 +24,8 @@
   "send_leave_notification",
   "leave_approval_notification_template",
   "leave_status_notification_template",
+  "send_comp_off_notification",
+  "comp_off_credit_template",
   "leave_approver_mandatory_in_leave_application",
   "restrict_backdated_leave_application",
   "prevent_self_leave_approval",
@@ -32,6 +34,7 @@
   "expense_approver_mandatory_in_expense_claim",
   "show_leaves_of_all_department_members_in_calendar",
   "auto_leave_encashment",
+  "max_half_days",
   "shift_settings_section",
   "allow_multiple_shift_assignments",
   "hiring_settings_section",
@@ -336,13 +339,31 @@
    "fieldname": "prevent_self_leave_approval",
    "fieldtype": "Check",
    "label": "Prevent self approval for leaves even if user has permissions"
+  },
+  {
+   "fieldname": "comp_off_credit_template",
+   "fieldtype": "Link",
+   "label": "Comp Off Credit Template",
+   "options": "Email Template"
+  },
+  {
+   "default": "0",
+   "fieldname": "send_comp_off_notification",
+   "fieldtype": "Check",
+   "label": "Send Comp Off Credit Notification"
+  },
+  {
+   "fieldname": "max_half_days",
+   "fieldtype": "Int",
+   "label": "Max Half Days"
   }
  ],
+ "grid_page_length": 50,
  "icon": "fa fa-cog",
  "idx": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-01-30 12:41:22.594071",
+ "modified": "2025-05-21 10:33:40.826362",
  "modified_by": "Administrator",
  "module": "HR",
  "name": "HR Settings",
@@ -377,6 +398,7 @@
    "role": "Employee"
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "ASC",
  "states": [],

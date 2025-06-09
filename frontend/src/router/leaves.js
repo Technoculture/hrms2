@@ -15,6 +15,11 @@ const routes = [
 		props: true,
 		component: () => import("@/views/leave/Form.vue"),
 	},
+	{
+		name: "EmployeesOnLeaveList",
+		path: "/employees-on-leave",
+		component: () => import("@/views/leave/EmployeesOnLeaveList.vue"),
+	},
 ]
 
 export default routes
