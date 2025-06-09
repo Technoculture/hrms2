@@ -54,10 +54,10 @@ const quickLinks = [
 	// 	title: __("Request an Advance"),
 	// 	route: "EmployeeAdvanceFormView",
 	// },
-	{
-		icon: markRaw(SalaryIcon),
-		title: __("View Salary Slips"),
-		route: "SalarySlipsDashboard",
-	},
+	// {
+	// 	icon: markRaw(SalaryIcon),
+	// 	title: __("View Salary Slips"),
+	// 	route: "SalarySlipsDashboard",
+	// },
 ]
 </script>
