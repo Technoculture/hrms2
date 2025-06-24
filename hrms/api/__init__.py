@@ -3,8 +3,8 @@ from frappe import _
 from frappe.model import get_permitted_fields
 from frappe.model.workflow import get_workflow_name
 from frappe.query_builder import Order
-from frappe.utils import add_days, date_diff, getdate, strip_html
-
+from frappe.utils import add_days, date_diff, getdate, strip_html, get_time
+import datetime
 from erpnext.setup.doctype.employee.employee import get_holiday_list_for_employee
 
 SUPPORTED_FIELD_TYPES = [
@@ -133,6 +133,8 @@ def get_attendance_calendar_events(employee: str, from_date: str, to_date: str) 
 			events[date_str] = "Holiday"
 		date = add_days(date, 1)
 
+	print("events",events)
+
 	return events
 
 
@@ -140,8 +142,35 @@ def get_attendance_for_calendar(employee: str, from_date: str, to_date: str) -> 
 	attendance = frappe.get_all(
 		"Attendance",
 		{"employee": employee, "attendance_date": ["between", [from_date, to_date]]},
-		["attendance_date", "status"],
+		["attendance_date", "status", "shift", "in_time", "out_time"],
 	)
+	# if status is half day, then check if it's first half or second half
+	for d in attendance:
+		if d["status"] == "Half Day":
+			# get the start time and end time of the shift
+			shift = frappe.get_doc("Shift Type", d["shift"])
+			start_time = shift.start_time
+			end_time = shift.end_time
+			in_time = get_time(d["in_time"])
+			out_time = get_time(d["out_time"])
+			# Convert all times to datetime.time for proper comparison
+			if isinstance(start_time, datetime.timedelta):
+				start_time = (datetime.datetime.min + start_time).time()
+			if isinstance(end_time, datetime.timedelta):
+				end_time = (datetime.datetime.min + end_time).time()
+			# if out_time is more towards the start time, then it's first half
+			# Calculate mid_day_time by converting times to seconds, finding midpoint, then back to time
+			start_seconds = start_time.hour * 3600 + start_time.minute * 60 + start_time.second
+			end_seconds = end_time.hour * 3600 + end_time.minute * 60 + end_time.second
+			mid_seconds = (start_seconds + end_seconds) / 2
+			mid_day_time = datetime.time(int(mid_seconds // 3600), int((mid_seconds % 3600) // 60), int(mid_seconds % 60))
+			if out_time < mid_day_time:
+				d["status"] = "First Half"
+			# if in_time is more towards the end time, then it's second half
+			elif in_time > mid_day_time:
+				d["status"] = "Second Half"
+			else:
+				d["status"] = "First Half"
 	return {d["attendance_date"]: d["status"] for d in attendance}
 
 
@@ -398,8 +427,6 @@ def get_my_lwp_consumption(employee: str) -> dict:
 	company = frappe.db.get_value("Employee", employee, "company")
 	leave_period = frappe.get_doc("Leave Period", {"company": company, "is_active": 1})
 
-	print("leave_period",leave_period)
-
 	if not leave_period:
 		return {}
 
@@ -413,13 +440,9 @@ def get_my_lwp_consumption(employee: str) -> dict:
 			"allocated_leaves": 0,
 			"balance_leaves": total_leave_days,
 		}
-	print("lwps",lwps)
-
-
 
 	# Get leave application for the leave period
 	leave_applications = frappe.db.get_all("Leave Application", {"employee": employee, "status": "Approved", "leave_type": ["in", lwps], "from_date": ["<=", leave_period.to_date], "to_date": [">=", leave_period.from_date]}, ["total_leave_days", "leave_type"])
-	print(leave_applications)
 
 	# Calculate total leave days consumed
 	total_leave_days = sum(application.total_leave_days for application in leave_applications)
@@ -430,9 +453,6 @@ def get_my_lwp_consumption(employee: str) -> dict:
 			"allocated_leaves": max_allowed_lwps,
 			"balance_leaves": max_allowed_lwps - total_leave_days,
 		}
-	
-	print("leave_map",leave_map)
-
 	return leave_map
 
 

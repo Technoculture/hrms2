@@ -31,10 +31,26 @@
 				<div v-for="_ in firstOfMonth.get('d')" />
 				<div v-for="index in firstOfMonth.endOf('M').get('D')">
 					<div
-						class="h-8 w-8 flex rounded-full mx-auto"
-						:class="getEventOnDate(index) && colorMap[getEventOnDate(index)]"
+						class="h-8 w-8 flex rounded-full mx-auto relative"
+						:class="{
+							[colorMap[getEventOnDate(index)]]: getEventOnDate(index) && getEventOnDate(index) !== 'First Half' && getEventOnDate(index) !== 'Second Half',
+						}"
 					>
-						<span class="text-gray-800 text-sm font-medium m-auto">
+						<div 
+							v-if="getEventOnDate(index) === 'First Half'" 
+							class="absolute inset-0 rounded-full overflow-hidden"
+						>
+							<div class="h-full w-1/2 bg-yellow-200 absolute left-0"></div>
+							<div class="h-full w-1/2 bg-red-200 absolute right-0"></div>
+						</div>
+						<div 
+							v-if="getEventOnDate(index) === 'Second Half'" 
+							class="absolute inset-0 rounded-full overflow-hidden"
+						>
+							<div class="h-full w-1/2 bg-red-200 absolute left-0"></div>
+							<div class="h-full w-1/2 bg-yellow-200 absolute right-0"></div>
+						</div>
+						<span class="text-gray-800 text-sm font-medium m-auto z-10">
 							{{ index }}
 						</span>
 					</div>
@@ -47,7 +63,15 @@
 			<div class="grid grid-cols-4 mx-2">
 				<div v-for="status in summaryStatuses" class="flex flex-col gap-1">
 					<div class="flex flex-row gap-1 items-center">
-						<span class="rounded full h-3 w-3" :class="colorMap[status]" />
+						<span v-if="status !== 'First Half' && status !== 'Second Half'" class="rounded-full h-3 w-3" :class="colorMap[status]" />
+						<div v-if="status === 'First Half'" class="relative rounded-full h-3 w-3 overflow-hidden">
+							<div class="absolute inset-0 bg-red-200"></div>
+							<div class="absolute inset-0 w-1/2 h-full bg-yellow-200 left-0"></div>
+						</div>
+						<div v-if="status === 'Second Half'" class="relative rounded-full h-3 w-3 overflow-hidden">
+							<div class="absolute inset-0 bg-yellow-200"></div>
+							<div class="absolute inset-0 w-1/2 h-full bg-red-200 right-0"></div>
+						</div>
 						<span class="text-gray-600 text-sm font-medium leading-5"> {{ __(status) }} </span>
 					</div>
 					<span class="text-gray-800 text-base font-semibold leading-6 mx-auto">
@@ -71,14 +95,16 @@ const firstOfMonth = ref(dayjs().date(1).startOf("D"))
 const colorMap = {
 	Present: "bg-green-300",
 	"Work From Home": "bg-green-300",
-	"Half Day": "bg-yellow-200",
+	// "Half Day": "bg-yellow-200",
+	"First Half": "bg-yellow-200",
+	"Second Half": "bg-yellow-200",
 	Absent: "bg-red-200",
 	"On Leave": "bg-blue-300",
 	Holiday: "bg-gray-300",
 }
 
 // __("Present"), __("Half Day"), __("Absent"), __("On Leave"), __("Work From Home")
-const summaryStatuses = ["Present", "Half Day", "Absent", "On Leave"]
+const summaryStatuses = ["Present", "Absent", "On Leave", "First Half", "Second Half"]
 
 const summary = computed(() => {
 	const summary = {}
