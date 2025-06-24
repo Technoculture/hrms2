@@ -29,14 +29,14 @@
 						:emptyStateMessage="__('You have no upcoming shifts')"
 					/>
 				</div>
-				<div class="w-full">
+				<!-- <div class="w-full">
 					<router-link :to="{ name: 'ShiftRequestFormView' }" v-slot="{ navigate }">
 						<Button @click="navigate" variant="solid" class="w-full py-5 text-base">
 							{{ __("Request a Shift") }}
 						</Button>
 					</router-link>
-				</div>
-				<div>
+				</div> -->
+				<!-- <div>
 					<div class="text-lg text-gray-800 font-bold">{{ __("Recent Shift Requests") }}</div>
 					<RequestList
 						:component="markRaw(ShiftRequestItem)"
@@ -44,7 +44,7 @@
 						:addListButton="true"
 						listButtonRoute="ShiftRequestListView"
 					/>
-				</div>
+				</div> -->
 			</div>
 		</template>
 	</BaseLayout>

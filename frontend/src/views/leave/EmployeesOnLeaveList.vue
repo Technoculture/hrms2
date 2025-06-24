@@ -36,7 +36,7 @@
                 {{ formatDateRange(employee.start_date, employee.end_date) }}
               </div>
               <div class="text-xs text-gray-400">
-                {{ employee.leave_type }} ({{ isHalfDayToday(employee.half_day_date) ? halfDaySession(employee.custom_half_day_session) : __("Full Day") }})
+                {{ isHalfDayToday(employee.half_day_date) ? halfDaySession(employee.custom_half_day_session) : __("Full Day") }}
               </div>
             </div>
           </div>

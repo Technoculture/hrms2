@@ -4,7 +4,7 @@
 			<div class="flex flex-col items-center my-7 p-4 gap-7">
 				<CheckInPanel />
 				<EmployeesOnLeave />
-				<QuickLinks :items="quickLinks" :title="__('Quick Links')" />
+				<QuickLinks :items="quickLinks" :title="__('Employee Dashboard')" />
 				<RequestPanel />
 			</div>
 		</template>
@@ -59,5 +59,10 @@ const quickLinks = [
 	// 	title: __("View Salary Slips"),
 	// 	route: "SalarySlipsDashboard",
 	// },
+	{
+		icon: markRaw(LeaveIcon),
+		title: __("Attendance History"),
+		route: "EmployeeCheckinListView",
+	},
 ]
 </script>
