@@ -24,7 +24,7 @@ export const myLeaves = createResource({
 	url: "hrms.api.get_leave_applications",
 	params: {
 		employee: employeeResource.data.name,
-		limit: 10,
+		limit: 5,
 	},
 	auto: true,
 	cache: "hrms:my_leaves",
@@ -42,7 +42,7 @@ export const teamLeaves = createResource({
 		employee: employeeResource.data.name,
 		approver_id: employeeResource.data.user_id,
 		for_approval: 1,
-		limit: 10,
+		limit: 5,
 	},
 	auto: true,
 	cache: "hrms:team_leaves",
@@ -69,3 +69,32 @@ export const leaveBalance = createResource({
 		)
 	},
 })
+
+export const myLWBalance = createResource({
+	url: "hrms.api.get_my_lwp_consumption",
+	params: {
+		employee: employeeResource.data.name,
+	},
+	auto: true,
+	cache: "hrms:my_lwp_balance",
+	transform: (data) => {
+		return Object.fromEntries(
+			Object.entries(data).map(([leave_type, allocation]) => {
+				allocation.balance_percentage =
+					(allocation.balance_leaves / allocation.allocated_leaves) * 100
+				return [leave_type, allocation]
+			})
+		)
+	},
+})
+
+export const getMergedLeaveBalance = (leaveBalanceData, myLWBalanceData) => {
+	let data = {}
+	if (leaveBalanceData) {
+		data = { ...data, ...leaveBalanceData }
+	}
+	if (myLWBalanceData) {
+		data = { ...data, ...myLWBalanceData }
+	}
+	return data
+}

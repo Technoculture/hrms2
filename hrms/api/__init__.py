@@ -389,6 +389,52 @@ def get_leave_balance_map(employee: str) -> dict[str, dict[str, float]]:
 
 	return leave_map
 
+@frappe.whitelist()
+def get_my_lwp_consumption(employee: str) -> dict:
+	from hrms.hr.doctype.leave_application.leave_application import get_leave_details
+
+	date = getdate()
+	# Retrieve active leave period for the company of employee
+	company = frappe.db.get_value("Employee", employee, "company")
+	leave_period = frappe.get_doc("Leave Period", {"company": company, "is_active": 1})
+
+	print("leave_period",leave_period)
+
+	if not leave_period:
+		return {}
+
+	# get max_allowed_lwp
+	lwps = frappe.get_list("Leave Type", filters={"is_lwp": 1}, pluck="name")
+
+	leave_map = {}
+
+	if not lwps:
+		leave_map['Leave Without Pay'] =  {
+			"allocated_leaves": 0,
+			"balance_leaves": total_leave_days,
+		}
+	print("lwps",lwps)
+
+
+
+	# Get leave application for the leave period
+	leave_applications = frappe.db.get_all("Leave Application", {"employee": employee, "status": "Approved", "leave_type": ["in", lwps], "from_date": ["<=", leave_period.to_date], "to_date": [">=", leave_period.from_date]}, ["total_leave_days", "leave_type"])
+	print(leave_applications)
+
+	# Calculate total leave days consumed
+	total_leave_days = sum(application.total_leave_days for application in leave_applications)
+
+	max_allowed_lwps = frappe.get_value("Leave Type", lwps[0], "max_leaves_allowed")
+
+	leave_map[lwps[0]] = {
+			"allocated_leaves": max_allowed_lwps,
+			"balance_leaves": max_allowed_lwps - total_leave_days,
+		}
+	
+	print("leave_map",leave_map)
+
+	return leave_map
+
 
 @frappe.whitelist()
 def get_holidays_for_employee(employee: str) -> list[dict]:
