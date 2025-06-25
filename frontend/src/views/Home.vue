@@ -22,6 +22,7 @@ import EmployeesOnLeave from "@/components/EmployeesOnLeave.vue"
 import AttendanceIcon from "@/components/icons/AttendanceIcon.vue"
 import ShiftIcon from "@/components/icons/ShiftIcon.vue"
 import LeaveIcon from "@/components/icons/LeaveIcon.vue"
+import RegularizationIcon from "@/components/icons/RegularizationIcon.vue"
 import ExpenseIcon from "@/components/icons/ExpenseIcon.vue"
 import EmployeeAdvanceIcon from "@/components/icons/EmployeeAdvanceIcon.vue"
 import SalaryIcon from "@/components/icons/SalaryIcon.vue"
@@ -43,6 +44,11 @@ const quickLinks = [
 		icon: markRaw(LeaveIcon),
 		title: __("Request Leave"),
 		route: "LeaveApplicationFormView",
+	},
+	{
+		icon: markRaw(RegularizationIcon),
+		title: __("Request Regularization"),
+		route: "RegularizationFormView",
 	},
 	// {
 	// 	icon: markRaw(ExpenseIcon),
