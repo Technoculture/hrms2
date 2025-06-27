@@ -199,37 +199,32 @@ const submitRegularization = async () => {
   try {
     error.value = null
     isSubmitting.value = true
-    
-    // Validate form
+
+    // Validate form inputs
     validateForm()
-    
-    const response = await fetch("/api/method/tcr_erp.tcr_erp.doctype.attendance_regularization.attendance_regularization.create_regularization", {
+
+    const response = await fetch("/api/method/hrms.api.attendance_regularization.submit_attendance_regularization", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Accept": "application/json"
       },
-      body: JSON.stringify(formData.value)
+      body: JSON.stringify({
+        date: formData.value.date,
+        regularisation_reasonn: formData.value.regularisation_reasonn,
+        in_out_records: formData.value.in_out_records
+        // Note: employee is resolved from session on the server side
+      })
     })
-    
-    // Check if response is OK
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
-    }
-    
-    // Check content type
+
     const contentType = response.headers.get("content-type")
-    if (!contentType || !contentType.includes("application/json")) {
-      throw new Error(__("Invalid response format from server"))
+    if (!response.ok || !contentType.includes("application/json")) {
+      throw new Error(`Invalid server response (status: ${response.status})`)
     }
-    
+
     const data = await response.json()
-    
-    if (data.error) {
-      throw new Error(data.error)
-    }
-    
-    if (data.message) {
+
+    if (data.message?.status === "success") {
       toast({
         title: __("Success"),
         text: __("Regularization request submitted successfully"),
@@ -239,15 +234,15 @@ const submitRegularization = async () => {
       })
       router.push("/")
     } else {
-      throw new Error(__("Failed to submit regularization request"))
+      throw new Error(data.message?.message || __("Failed to submit request"))
     }
   } catch (err) {
     console.error("Error submitting regularization:", err)
-    error.value = err.message || __("Failed to submit regularization request")
-    
+    error.value = err.message || __("Submission failed")
+
     toast({
       title: __("Error"),
-      text: err.message || __("Failed to submit regularization request"),
+      text: err.message || __("Submission failed"),
       icon: "x",
       iconClasses: "text-red-500",
       position: "bottom-center"
@@ -256,4 +251,5 @@ const submitRegularization = async () => {
     isSubmitting.value = false
   }
 }
+
 </script> 
