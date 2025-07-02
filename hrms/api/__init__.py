@@ -133,7 +133,6 @@ def get_attendance_calendar_events(employee: str, from_date: str, to_date: str) 
 			events[date_str] = "Holiday"
 		date = add_days(date, 1)
 
-	print("events",events)
 
 	return events
 
@@ -141,34 +140,47 @@ def get_attendance_calendar_events(employee: str, from_date: str, to_date: str) 
 def get_attendance_for_calendar(employee: str, from_date: str, to_date: str) -> list[dict[str, str]]:
 	attendance = frappe.get_all(
 		"Attendance",
-		{"employee": employee, "attendance_date": ["between", [from_date, to_date]]},
-		["attendance_date", "status", "shift", "in_time", "out_time"],
+		{"employee": employee, "docstatus": 1, "attendance_date": ["between", [from_date, to_date]]},
+		["attendance_date", "status", "shift", "in_time", "out_time", "leave_application"],
 	)
 	# if status is half day, then check if it's first half or second half
 	for d in attendance:
 		if d["status"] == "Half Day":
+			# if there is any leave_application
+			leave_application = d.get("leave_application")
+			if leave_application:
+				# get the leave application
+				leave_session = frappe.db.get_value("Leave Application", leave_application, "custom_half_day_session")
+				if leave_session == "FIRST HALF":
+					d["status"] = "First Half"
+				elif leave_session == "SECOND HALF":
+					d["status"] = "Second Half"
+				continue
 			# get the start time and end time of the shift
-			shift = frappe.get_doc("Shift Type", d["shift"])
-			start_time = shift.start_time
-			end_time = shift.end_time
-			in_time = get_time(d["in_time"])
-			out_time = get_time(d["out_time"])
-			# Convert all times to datetime.time for proper comparison
-			if isinstance(start_time, datetime.timedelta):
-				start_time = (datetime.datetime.min + start_time).time()
-			if isinstance(end_time, datetime.timedelta):
-				end_time = (datetime.datetime.min + end_time).time()
-			# if out_time is more towards the start time, then it's first half
-			# Calculate mid_day_time by converting times to seconds, finding midpoint, then back to time
-			start_seconds = start_time.hour * 3600 + start_time.minute * 60 + start_time.second
-			end_seconds = end_time.hour * 3600 + end_time.minute * 60 + end_time.second
-			mid_seconds = (start_seconds + end_seconds) / 2
-			mid_day_time = datetime.time(int(mid_seconds // 3600), int((mid_seconds % 3600) // 60), int(mid_seconds % 60))
-			if out_time < mid_day_time:
-				d["status"] = "First Half"
-			# if in_time is more towards the end time, then it's second half
-			elif in_time > mid_day_time:
-				d["status"] = "Second Half"
+			if d["shift"]:
+				shift = frappe.get_doc("Shift Type", d["shift"])
+				start_time = shift.start_time
+				end_time = shift.end_time
+				in_time = get_time(d["in_time"])
+				out_time = get_time(d["out_time"])
+				# Convert all times to datetime.time for proper comparison
+				if isinstance(start_time, datetime.timedelta):
+					start_time = (datetime.datetime.min + start_time).time()
+				if isinstance(end_time, datetime.timedelta):
+					end_time = (datetime.datetime.min + end_time).time()
+				# if out_time is more towards the start time, then it's first half
+				# Calculate mid_day_time by converting times to seconds, finding midpoint, then back to time
+				start_seconds = start_time.hour * 3600 + start_time.minute * 60 + start_time.second
+				end_seconds = end_time.hour * 3600 + end_time.minute * 60 + end_time.second
+				mid_seconds = (start_seconds + end_seconds) / 2
+				mid_day_time = datetime.time(int(mid_seconds // 3600), int((mid_seconds % 3600) // 60), int(mid_seconds % 60))
+				if out_time < mid_day_time:
+					d["status"] = "First Half"
+				# if in_time is more towards the end time, then it's second half
+				elif in_time > mid_day_time:
+					d["status"] = "Second Half"
+				else:
+					d["status"] = "First Half"
 			else:
 				d["status"] = "First Half"
 	return {d["attendance_date"]: d["status"] for d in attendance}
