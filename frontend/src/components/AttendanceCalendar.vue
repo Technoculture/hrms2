@@ -104,7 +104,7 @@ const colorMap = {
 }
 
 // __("Present"), __("Half Day"), __("Absent"), __("On Leave"), __("Work From Home")
-const summaryStatuses = ["Present", "Absent", "On Leave"]
+const summaryStatuses = ["Present", "Absent", "On Leave", "Half Day"]
 // combinations for half day present-leave, leave-present, absent-leave, leave-absent
 
 const summary = computed(() => {
@@ -121,6 +121,11 @@ const summary = computed(() => {
 			}
 		}
 		if (updatedStatus === "First Half" || updatedStatus === "Second Half") {
+			if ("Half Day" in summary) {
+				summary["Half Day"] += 1
+			} else {
+				summary["Half Day"] = 1
+			}
 			if ("Present" in summary) {
 				summary["Present"] += 0.5
 			} else {
