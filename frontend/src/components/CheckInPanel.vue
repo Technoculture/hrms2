@@ -39,29 +39,41 @@
 		:breakpoints="[0, 1]"
 	>
 		<div class="h-120 w-full flex flex-col items-center justify-center gap-5 p-4 mb-5">
-			<div class="flex flex-col gap-1.5 mt-2 items-center justify-center">
-				<div class="font-bold text-xl">
-					{{ dayjs(checkinTimestamp).format("hh:mm:ss a") }}
+			<div class="flex flex-row items-center justify-between w-full">
+				<div></div>
+				<div class="flex flex-col gap-1.5 mt-2 items-center justify-center">
+					<div class="font-bold text-xl">
+						{{ dayjs(checkinTimestamp).format("hh:mm:ss a") }}
+					</div>
+					<div class="font-medium text-gray-500 text-sm">
+						{{ dayjs().format("D MMM, YYYY") }}
+					</div>
 				</div>
-				<div class="font-medium text-gray-500 text-sm">
-					{{ dayjs().format("D MMM, YYYY") }}
-				</div>
+				<template v-if="settings.data?.allow_geolocation_tracking"">
+					<button 
+						@click="refreshLocation" 
+						class="pr-4 rounded-full hover:bg-gray-100"
+						title="Refresh location"
+					>
+						<FeatherIcon name="refresh-cw" stroke-width="4" class="w-4 h-4 text-gray-600" />
+					</button>
+				</template>
 			</div>
 
 			<template v-if="settings.data?.allow_geolocation_tracking">
-				<div class="flex flex-row items-center justify-between w-full">
-					<span></span>
+				<!-- <div class="flex flex-row items-center justify-between w-full">
+					<span></span> -->
 					<span v-if="locationStatus" class="font-medium text-gray-500 text-sm">
 						{{ locationStatus }}
 					</span>
-					<button 
+					<!-- <button 
 						@click="refreshLocation" 
 						class="p-2 rounded-full hover:bg-gray-100"
 						title="Refresh location"
 					>
 						<FeatherIcon name="refresh-cw" class="w-4 h-4 text-gray-600" />
-					</button>
-				</div>
+					</button> -->
+				<!-- </div> -->
 
 				<div class="rounded border-4 translate-z-0 block overflow-hidden w-full h-170">
 					<iframe
