@@ -20,7 +20,7 @@
 					/>
 				</div>
 				<div>
-					<div class="text-lg text-gray-800 font-bold">{{ __("Upcoming Shifts") }}</div>
+					<div class="text-lg text-gray-800 font-bold">{{ __("My Shifts") }}</div>
 					<RequestList
 						:component="markRaw(ShiftAssignmentItem)"
 						:items="upcomingShifts"
