@@ -41,13 +41,13 @@
 							class="absolute inset-0 rounded-full overflow-hidden"
 						>
 							<div class="h-full w-1/2 bg-yellow-200 absolute left-0"></div>
-							<div class="h-full w-1/2 bg-red-200 absolute right-0"></div>
+							<div class="h-full w-1/2 bg-green-200 absolute right-0"></div>
 						</div>
 						<div 
 							v-if="getEventOnDate(index) === 'Second Half'" 
 							class="absolute inset-0 rounded-full overflow-hidden"
 						>
-							<div class="h-full w-1/2 bg-red-200 absolute left-0"></div>
+							<div class="h-full w-1/2 bg-green-200 absolute left-0"></div>
 							<div class="h-full w-1/2 bg-yellow-200 absolute right-0"></div>
 						</div>
 						<span class="text-gray-800 text-sm font-medium m-auto z-10">
@@ -104,17 +104,33 @@ const colorMap = {
 }
 
 // __("Present"), __("Half Day"), __("Absent"), __("On Leave"), __("Work From Home")
-const summaryStatuses = ["Present", "Absent", "On Leave", "First Half", "Second Half"]
+const summaryStatuses = ["Present", "Absent", "On Leave"]
+// combinations for half day present-leave, leave-present, absent-leave, leave-absent
 
 const summary = computed(() => {
 	const summary = {}
+	console.log("calendarEvents.data", Object.values(calendarEvents.data))
 
 	for (const status of Object.values(calendarEvents.data)) {
 		let updatedStatus = status === "Work From Home" ? "Present" : status
 		if (updatedStatus in summary) {
 			summary[updatedStatus] += 1
 		} else {
-			summary[updatedStatus] = 1
+			if (updatedStatus !== "First Half" && updatedStatus !== "Second Half") {
+				summary[updatedStatus] = 1
+			}
+		}
+		if (updatedStatus === "First Half" || updatedStatus === "Second Half") {
+			if ("Present" in summary) {
+				summary["Present"] += 0.5
+			} else {
+				summary["Present"] = 0.5
+			}
+			if ("On Leave" in summary) {
+				summary["On Leave"] += 0.5
+			} else {
+				summary["On Leave"] = 0.5
+			}
 		}
 	}
 
