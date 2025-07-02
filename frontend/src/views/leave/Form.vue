@@ -151,6 +151,9 @@ function getFilteredFields(fields) {
 		"sb_other_details",
 		"salary_slip",
 		"letter_head",
+		// "leave_approver",
+		// "leave_approver_name",
+		// "section_break_7"
 	]
 
 	const employeeFields = [
