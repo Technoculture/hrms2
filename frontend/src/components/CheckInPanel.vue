@@ -12,22 +12,18 @@
 					<span @click="navigate" class="underline">View List</span>
 				</router-link>
 			</div>
-			<Button
-				class="mt-4 mb-1 drop-shadow-sm py-5 text-base"
-				:class="[
-					nextAction.action === 'IN' ? 'bg-green-600 hover:bg-green-800' : 'bg-red-500 hover:bg-red-700'
-				]"
+			<button
+				:class="buttonClass"
 				id="open-checkin-modal"
 				@click="handleEmployeeCheckin"
+				class="w-full flex items-center justify-center gap-2 font-semibold rounded-md"
 			>
-				<template #prefix>
-					<FeatherIcon
-						:name="nextAction.action === 'IN' ? 'arrow-right-circle' : 'arrow-left-circle'"
-						class="w-4"
-					/>
-				</template>
+				<FeatherIcon
+					:name="nextAction.action === 'IN' ? 'arrow-right-circle' : 'arrow-left-circle'"
+					class="w-4"
+				/>
 				{{ nextAction.label }}
-			</Button>
+			</button>
 		</template>
 
 		<div v-else class="font-medium text-sm text-gray-500 mt-1.5">
@@ -162,6 +158,13 @@ function handleLocationSuccess(position) {
 	// Increment key to force iframe refresh
 	locationRefreshKey.value++
 }
+const buttonClass = computed(() => {
+	const base = "mt-4 mb-1 drop-shadow-sm py-3 text-base"
+	const bg = nextAction.value.action === 'IN'
+		? "bg-green-500 hover:bg-green-600"
+		: "bg-red-500 hover:bg-red-700"
+	return `${base} ${bg}`
+})
 
 function handleLocationError(error) {
 	locationStatus.value = "Unable to retrieve your location"
