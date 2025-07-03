@@ -5,6 +5,7 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite",
+		"dev-pwa": "vite",
 		"serve": "vite preview",
 		"build": "vite build --base=/assets/hrms/frontend/ && yarn copy-html-entry",
 		"ionic:build": "npm run build",
@@ -16,6 +17,7 @@
 		"@ionic/vue-router": "^7.4.3",
 		"@vitejs/plugin-vue": "^4.4.0",
 		"autoprefixer": "^10.4.19",
+		"axios": "^1.10.0",
 		"dayjs": "^1.11.11",
 		"feather-icons": "^4.29.1",
 		"firebase": "^10.8.0",

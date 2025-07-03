@@ -1,4 +1,8 @@
-{
-  path: "/attendance-regularization",
-  component: () => import("./views/RegularizationFormView.vue")
-}
+const routes = [
+  {
+    path: "/attendance-regularization",
+    component: () => import("./views/RegularizationFormView.vue"),
+  },
+];
+
+export default routes;

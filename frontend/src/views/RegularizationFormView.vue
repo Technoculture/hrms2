@@ -1,255 +1,118 @@
 <template>
-  <BaseLayout pageTitle="Attendance Regularization">
-    <template #body>
-      <div class="flex flex-col p-4 gap-5">
-        <div class="w-full bg-white rounded-lg shadow p-5">
-          <form @submit.prevent="submitRegularization" class="space-y-5">
-            <!-- Date Selection -->
-            <div class="form-group">
-              <label class="block text-sm font-medium text-gray-700 mb-2">
-                {{ __("Date") }}
-              </label>
-              <div class="relative">
-                <input
-                  type="date"
-                  v-model="formData.date"
-                  class="w-full px-3 py-2 border rounded-md pr-10"
-                  :max="maxDate"
-                  required
-                  placeholder="dd/mm/yyyy"
-                />
-              </div>
-              <p class="text-xs text-gray-500 mt-1">{{ __("Only dates up to today in the current month are allowed") }}</p>
-            </div>
+  <ion-page>
+    <ion-header>
+      <ion-toolbar>
+        <ion-title>Attendance Regularization</ion-title>
+      </ion-toolbar>
+    </ion-header>
 
-            <!-- In/Out Records -->
-            <div class="form-group">
-              <label class="block text-sm font-medium text-gray-700 mb-2">
-                {{ __("In/Out Records") }}
-              </label>
-              <div class="border rounded-md p-4 bg-gray-50">
-                <div v-for="(record, index) in formData.in_out_records" :key="index" class="flex gap-4 mb-4">
-                  <div class="flex-1">
-                    <label class="block text-sm text-gray-600 mb-1">{{ __("In Time") }}</label>
-                    <div class="relative">
-                      <input
-                        type="time"
-                        v-model="record.in_time"
-                        class="w-full px-3 py-2 border rounded-md pr-10"
-                        :required="!record.out_time"
-                        placeholder="--:--"
-                      />
-                    </div>
-                  </div>
-                  <div class="flex-1">
-                    <label class="block text-sm text-gray-600 mb-1">{{ __("Out Time") }}</label>
-                    <div class="relative">
-                      <input
-                        type="time"
-                        v-model="record.out_time"
-                        class="w-full px-3 py-2 border rounded-md pr-10"
-                        :required="!record.in_time"
-                        placeholder="--:--"
-                      />
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    @click="removeRecord(index)"
-                    class="mt-6 text-red-600 hover:text-red-800"
-                    v-if="formData.in_out_records.length > 1"
-                  >
-                    <FeatherIcon name="trash-2" class="h-5 w-5" />
-                  </button>
-                </div>
-                <p class="text-xs text-gray-500 mb-2">{{ __("At least one of In Time or Out Time is required for each record") }}</p>
-                <button
-                  type="button"
-                  @click="addRecord"
-                  class="mt-2 flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm font-medium"
-                >
-                  <FeatherIcon name="plus" class="h-4 w-4" />
-                  {{ __("Add Record") }}
-                </button>
-              </div>
-            </div>
+    <ion-content class="ion-padding">
+      <form @submit.prevent="submitRequest">
+        <ion-item>
+          <ion-label>Date</ion-label>
+          <ion-datetime
+            v-model="form.date"
+            presentation="date"
+            :max="today"
+          />
+        </ion-item>
 
-            <!-- Reason -->
-            <div class="form-group">
-              <label class="block text-sm font-medium text-gray-700 mb-2">
-                {{ __("Reason") }}
-              </label>
-              <textarea
-                v-model="formData.regularisation_reasonn"
-                rows="4"
-                class="w-full px-3 py-2 border rounded-md"
-                required
-              ></textarea>
-            </div>
+        <ion-item>
+          <ion-label>Reason</ion-label>
+          <ion-input v-model="form.reason" />
+        </ion-item>
 
-            <!-- Submit Button -->
-            <div class="flex justify-end">
-              <Button
-                type="submit"
-                :loading="isSubmitting"
-                :disabled="isSubmitting"
-                variant="solid"
-                class="w-full md:w-auto"
-              >
-                {{ isSubmitting ? __("Submitting...") : __("Submit") }}
-              </Button>
-            </div>
-          </form>
-          
-          <!-- Error Display -->
-          <div v-if="error" class="mt-4">
-            <div class="p-3 bg-red-100 text-red-700 rounded-md">
-              {{ error }}
-            </div>
-          </div>
+        <div v-for="(entry, index) in form.in_out_records" :key="index">
+          <ion-item>
+            <ion-label>In Time</ion-label>
+            <ion-datetime
+              v-model="entry.in_time"
+              presentation="time"
+            />
+          </ion-item>
+          <ion-item>
+            <ion-label>Out Time</ion-label>
+            <ion-datetime
+              v-model="entry.out_time"
+              presentation="time"
+            />
+          </ion-item>
+          <ion-button color="danger" fill="clear" @click="removeEntry(index)">Remove</ion-button>
         </div>
-      </div>
-    </template>
-  </BaseLayout>
+
+        <ion-button expand="block" @click="addEntry">+ Add Entry</ion-button>
+        <ion-button expand="block" type="submit" :disabled="loading">
+          {{ loading ? 'Submitting...' : 'Submit Request' }}
+        </ion-button>
+      </form>
+    </ion-content>
+  </ion-page>
 </template>
 
 <script setup>
-import { ref, inject, computed } from "vue"
-import { IonPage, IonContent } from "@ionic/vue"
-import { useRouter } from "vue-router"
-import BaseLayout from "@/components/BaseLayout.vue"
-import { Button, FeatherIcon, toast } from "frappe-ui"
+import { ref } from 'vue'
+import {
+  IonPage, IonHeader, IonToolbar, IonTitle,
+  IonContent, IonItem, IonLabel, IonDatetime,
+  IonInput, IonButton, toastController
+} from '@ionic/vue'
+import axios from 'axios'
 
-const router = useRouter()
-const __ = inject("$translate")
+const today = new Date().toISOString().split('T')[0]
 
-const isSubmitting = ref(false)
-const error = ref(null)
-const formData = ref({
-  date: "",
+const form = ref({
+  date: '',
+  reason: '',
+  employee: '', // Will fetch this below
+  company: '',
   in_out_records: [
-    {
-      in_time: "",
-      out_time: ""
-    }
-  ],
-  regularisation_reasonn: ""
+    { in_time: '', out_time: '' }
+  ]
 })
 
-// Calculate max date (today's date)
-const maxDate = computed(() => {
-  const today = new Date()
-  return today.toISOString().split('T')[0]
-})
+const loading = ref(false)
 
-const addRecord = () => {
-  formData.value.in_out_records.push({
-    in_time: "",
-    out_time: ""
-  })
+const addEntry = () => {
+  form.value.in_out_records.push({ in_time: '', out_time: '' })
 }
 
-const removeRecord = (index) => {
-  if (formData.value.in_out_records.length > 1) {
-    formData.value.in_out_records.splice(index, 1)
-  }
+const removeEntry = (index) => {
+  form.value.in_out_records.splice(index, 1)
 }
 
-const validateForm = () => {
-  // Check date
-  if (!formData.value.date) {
-    throw new Error(__("Please select a date"))
-  }
-  
-  // Check if date is in the future
-  const selectedDate = new Date(formData.value.date)
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  
-  if (selectedDate > today) {
-    throw new Error(__("Future dates are not allowed"))
-  }
-  
-  // Check if date is in current month
-  const currentMonth = new Date().getMonth()
-  const selectedMonth = selectedDate.getMonth()
-  const currentYear = new Date().getFullYear()
-  const selectedYear = selectedDate.getFullYear()
-  
-  if (selectedYear < currentYear || (selectedYear === currentYear && selectedMonth < currentMonth)) {
-    throw new Error(__("Only dates in the current month are allowed"))
-  }
-  
-  // Check reason
-  if (!formData.value.regularisation_reasonn.trim()) {
-    throw new Error(__("Please provide a reason for regularization"))
-  }
-  
-  // Check in/out records
-  for (const record of formData.value.in_out_records) {
-    if (!record.in_time && !record.out_time) {
-      throw new Error(__("Please provide at least In Time or Out Time for each record"))
-    }
-  }
-  
-  return true
+// Fetch current user’s employee and company
+const fetchMeta = async () => {
+  const { data } = await axios.get('/api/method/frappe.auth.get_logged_user')
+  const user = data.message
+  const res = await axios.get('/api/resource/Employee?filters=[["user_id","=","' + user + '"]]')
+  const emp = res.data.data[0]
+  form.value.employee = emp.name
+  form.value.company = emp.company
 }
 
-const submitRegularization = async () => {
+fetchMeta()
+
+const submitRequest = async () => {
+  loading.value = true
   try {
-    error.value = null
-    isSubmitting.value = true
-
-    // Validate form inputs
-    validateForm()
-
-    const response = await fetch("/api/method/hrms.api.attendance_regularization.submit_attendance_regularization", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Accept": "application/json"
-      },
-      body: JSON.stringify({
-        date: formData.value.date,
-        regularisation_reasonn: formData.value.regularisation_reasonn,
-        in_out_records: formData.value.in_out_records
-        // Note: employee is resolved from session on the server side
-      })
+    const response = await axios.post('/api/method/tcr_erp.api.create_regularization_request', form.value)
+    const msg = await toastController.create({
+      message: response.data.message || 'Request submitted!',
+      duration: 2000,
+      color: response.data.status === 'success' ? 'success' : 'danger'
     })
-
-    const contentType = response.headers.get("content-type")
-    if (!response.ok || !contentType.includes("application/json")) {
-      throw new Error(`Invalid server response (status: ${response.status})`)
-    }
-
-    const data = await response.json()
-
-    if (data.message?.status === "success") {
-      toast({
-        title: __("Success"),
-        text: __("Regularization request submitted successfully"),
-        icon: "check",
-        iconClasses: "text-green-500",
-        position: "bottom-center"
-      })
-      router.push("/")
-    } else {
-      throw new Error(data.message?.message || __("Failed to submit request"))
+    msg.present()
+    if (response.data.status === 'success') {
+      // Optional: redirect back to dashboard
     }
   } catch (err) {
-    console.error("Error submitting regularization:", err)
-    error.value = err.message || __("Submission failed")
-
-    toast({
-      title: __("Error"),
-      text: err.message || __("Submission failed"),
-      icon: "x",
-      iconClasses: "text-red-500",
-      position: "bottom-center"
+    const msg = await toastController.create({
+      message: err.response?.data?.message || 'Failed to submit request.',
+      duration: 2000,
+      color: 'danger'
     })
-  } finally {
-    isSubmitting.value = false
+    msg.present()
   }
+  loading.value = false
 }
-
-</script> 
+</script>
