@@ -95,7 +95,7 @@ const firstOfMonth = ref(dayjs().date(1).startOf("D"))
 const colorMap = {
 	Present: "bg-green-300",
 	"Work From Home": "bg-green-300",
-	// "Half Day": "bg-yellow-200",
+	"Half Day": "bg-yellow-200",
 	"First Half": "bg-yellow-200",
 	"Second Half": "bg-yellow-200",
 	Absent: "bg-red-200",

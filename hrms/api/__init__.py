@@ -157,7 +157,8 @@ def get_attendance_for_calendar(employee: str, from_date: str, to_date: str) -> 
 					d["status"] = "Second Half"
 				continue
 			# get the start time and end time of the shift
-			if d["shift"]:
+			shift = d.get("shift")
+			if shift:
 				shift = frappe.get_doc("Shift Type", d["shift"])
 				start_time = shift.start_time
 				end_time = shift.end_time
