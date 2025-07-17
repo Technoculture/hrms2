@@ -239,6 +239,7 @@ const employeeDoc = createDocumentResource({
 	auto: true,
 	transform: (data) => {
 		data.ctc = formatCurrency(data.ctc, data.salary_currency)
+		data.employee_number = data.name
 		return data
 	},
 })
@@ -265,6 +266,10 @@ const logout = async () => {
 		showErrorAlert(msg)
 	}
 }
+
+onMounted(() => {
+	console.log("F Employee:", employee.data)
+})
 
 onMounted(() => {
 	socket.emit("doctype_subscribe", DOCTYPE)
