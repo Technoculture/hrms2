@@ -1,4 +1,4 @@
 {
   path: "/attendance-regularization",
-  component: () => import("./views/RegularizationFormView.vue")
+  component: () => import("./views/attendance/AttendanceRegularizationForm.vue")
 }

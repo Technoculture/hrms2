@@ -45,11 +45,11 @@ const routes = [
 				name: "SalarySlipsDashboard",
 				component: () => import("@/views/salary_slip/Dashboard.vue"),
 			},
-			{
-				path: "/regularization",
-				name: "RegularizationFormView",
-				component: () => import("@/views/RegularizationFormView.vue"),
-			},
+			// {
+			// 	path: "/regularization",
+			// 	name: "RegularizationFormView",
+			// 	component: () => import("@/views/RegularizationFormView.vue"),
+			// },
 		],
 	},
 	{
