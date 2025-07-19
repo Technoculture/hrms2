@@ -9,7 +9,7 @@
 				<span>{{ __("Last {0} was at {1}", [__(lastLogType), formatTimestamp(lastLog.time)]) }}</span>
 				<span class="whitespace-pre"> &middot; </span>
 				<router-link :to="{ name: 'EmployeeCheckinListView' }" v-slot="{ navigate }">
-					<span @click="navigate" class="underline">View List</span>
+					<span @click="navigate" class="underline font-bold">View List</span>
 				</router-link>
 			</div>
 			<button

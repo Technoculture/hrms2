@@ -72,7 +72,7 @@
 							<div class="absolute inset-0 bg-yellow-200"></div>
 							<div class="absolute inset-0 w-1/2 h-full bg-red-200 right-0"></div>
 						</div>
-						<span class="text-gray-600 text-sm font-medium leading-5"> {{ __(status) }} </span>
+						<span class="text-gray-600 text-sm font-medium leading-5"> {{ __(status === "On Leave" ? "Leave" : status) }} </span>
 					</div>
 					<span class="text-gray-800 text-base font-semibold leading-6 mx-auto">
 						{{ summary[status] || 0 }}
