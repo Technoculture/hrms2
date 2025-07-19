@@ -1219,3 +1219,36 @@ def get_holidays(employee: str,start_date: str, end_date: str) -> dict[str, dict
 	holidays = frappe.get_all("Holiday", filters={"parent": holiday_list, "holiday_date": ("between", [start_date, end_date])}, fields=["holiday_date", "description", "weekly_off"])
 	holidays = {holiday.holiday_date.strftime("%Y-%m-%d"): {"description": holiday.description, "is_weekly_off": holiday.weekly_off} for holiday in holidays}
 	return holidays
+
+@frappe.whitelist()
+def get_employee_checkin_records(employee: str, date: str) -> list[dict]:
+	"""
+	Get employee checkin records for a specific date
+	Args:
+		employee (str): Employee ID
+		date (str): Date in YYYY-MM-DD format
+	Returns:
+		list[dict]: List of checkin records with log_type, time, device_id
+	"""
+	from frappe.utils import getdate, format_datetime
+	date_str = getdate(date).strftime("%Y-%m-%d")
+	# get employee checkin records for the date
+	checkins = frappe.get_all(
+		"Employee Checkin",
+		filters={
+			"employee": employee,
+			"time": ["between", [f"{date_str} 00:00:00", f"{date_str} 23:59:59"]]
+		},
+		fields=["log_type", "time", "device_id"],
+		order_by="time asc"
+	)
+	checkins = [
+		{
+			"log_type": checkin.log_type,
+			"time": format_datetime(checkin.time, format_string="hh:mm:ss"),
+			"timestamp": checkin.time
+		}
+		for checkin in checkins
+	]
+
+	return checkins

@@ -31,9 +31,9 @@ const __ = inject("$translate")
 
 const quickLinks = [
 	{
-		icon: markRaw(AttendanceIcon),
-		title: __("Request Attendance"),
-		route: "AttendanceRequestFormView",
+		icon: markRaw(RegularizationIcon),
+		title: __("Attendance Regularization"),
+		route: "AttendanceRegularizationFormView",
 	},
 	// {
 		// icon: markRaw(ShiftIcon),
@@ -44,11 +44,6 @@ const quickLinks = [
 		icon: markRaw(LeaveIcon),
 		title: __("Request Leave"),
 		route: "LeaveApplicationFormView",
-	},
-	{
-		icon: markRaw(RegularizationIcon),
-		title: __("Request Regularization"),
-		route: "RegularizationFormView",
 	},
 	// {
 	// 	icon: markRaw(ExpenseIcon),
@@ -67,6 +62,7 @@ const quickLinks = [
 	// },
 	{
 		icon: markRaw(LeaveIcon),
+		icon: markRaw(AttendanceIcon),
 		title: __("Attendance History"),
 		route: "AttendanceHistoryView",
 	},

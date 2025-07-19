@@ -4,7 +4,7 @@ from frappe import _
 from frappe.utils import today
 
 @frappe.whitelist()
-def submit_attendance_regularization(date, regularisation_reasonn, in_out_records):
+def submit_attendance_regularization(date, regularisation_reasonn, in_out_records, existing_checkins):
     from frappe.utils import getdate
 
     user = frappe.session.user
@@ -22,10 +22,21 @@ def submit_attendance_regularization(date, regularisation_reasonn, in_out_record
         "employee": employee,
         "date": getdate(date),
         "regularisation_reasonn": regularisation_reasonn,
-        "in_out_records": in_out_records
+        "in_out_records": in_out_records,
+        "custom_existing_checkins": existing_checkins
     })
+    print("existing_checkins", existing_checkins)
+    print("in_out_records", in_out_records)
 
-    doc.insert(ignore_permissions=True)
+    try:
+        doc.insert(ignore_permissions=True)
+    except Exception as e:
+        print("error", str(e))
+        return {
+            "status": "error",
+            "type": "validation",
+            "message": str(e)  # ✅ Return the string version of the exception
+        }
 
     return {
         "status": "success",

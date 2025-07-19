@@ -57,6 +57,17 @@ const routes = [
 		path: "/attendance-history",
 		component: () => import("@/views/attendance/AttendanceHistory.vue"),
 	},
+	{
+		name: "AttendanceRegularizationFormView",
+		path: "/attendance-regularization/new",
+		component: () => import("@/views/attendance/AttendanceRegularizationForm.vue"),
+	},
+	{
+		name: "AttendanceRegularizationDetailView",
+		path: "/attendance-regularization/:id",
+		props: true,
+		component: () => import("@/views/attendance/AttendanceRegularizationForm.vue"),
+	},
 ]
 
 export default routes
