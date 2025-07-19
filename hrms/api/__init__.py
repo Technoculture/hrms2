@@ -123,6 +123,7 @@ def get_attendance_calendar_events(employee: str, from_date: str, to_date: str) 
 	holidays = get_holidays_for_calendar(employee, from_date, to_date)
 	attendance = get_attendance_for_calendar(employee, from_date, to_date)
 	events = {}
+	open_leave_application_dates = get_open_leave_application_dates(employee, from_date, to_date)
 
 	date = getdate(from_date)
 	while date_diff(to_date, date) >= 0:
@@ -131,10 +132,30 @@ def get_attendance_calendar_events(employee: str, from_date: str, to_date: str) 
 			events[date_str] = attendance[date]
 		elif date in holidays:
 			events[date_str] = "Holiday"
+		elif date_str in open_leave_application_dates:
+			events[date_str] = "On Leave"
 		date = add_days(date, 1)
 
 
 	return events
+
+def get_open_leave_application_dates(employee: str, from_date: str, to_date: str) -> list[str]:
+	leave_applications = frappe.get_all("Leave Application", {"employee": employee, "status": "Open", "from_date": ["<=", to_date], "to_date": [">=", from_date]}, ["from_date", "to_date"])
+	dates = []
+	for leave_application in leave_applications:
+		dates.extend(get_dates_from_date_range(leave_application.from_date, leave_application.to_date))
+	# get holidays in the date range
+	holidays = get_holidays_for_calendar(employee, from_date, to_date)
+	dates = [date for date in dates if date not in holidays]
+	return dates
+
+def get_dates_from_date_range(from_date: str, to_date: str) -> list[str]:
+	dates = []
+	date = getdate(from_date)
+	while date_diff(to_date, date) >= 0:
+		dates.append(date.strftime("%Y-%m-%d"))
+		date = add_days(date, 1)
+	return dates
 
 
 def get_attendance_for_calendar(employee: str, from_date: str, to_date: str) -> list[dict[str, str]]:
@@ -422,11 +443,16 @@ def get_leave_balance_map(employee: str) -> dict[str, dict[str, float]]:
 
 	leave_details = get_leave_details(employee, date)
 	allocation = leave_details["leave_allocation"]
+	company = frappe.db.get_value("Employee", employee, "company")
+	leave_period = frappe.get_doc("Leave Period", {"company": company, "is_active": 1})
 
 	for leave_type, details in allocation.items():
+		leave_applications = frappe.db.get_all("Leave Application", {"employee": employee, "status": ["in", ["Approved", "Open"]], "leave_type": leave_type, "from_date": ["<=", leave_period.to_date], "to_date": [">=", leave_period.from_date]}, ["total_leave_days", "leave_type"])
+		# Calculate total leave days consumed
+		total_leave_days = sum(application.total_leave_days for application in leave_applications)
 		leave_map[leave_type] = {
 			"allocated_leaves": details.get("total_leaves"),
-			"balance_leaves": details.get("remaining_leaves"),
+			"balance_leaves": details.get("total_leaves") - total_leave_days,
 		}
 
 	return leave_map
@@ -455,7 +481,7 @@ def get_my_lwp_consumption(employee: str) -> dict:
 		}
 
 	# Get leave application for the leave period
-	leave_applications = frappe.db.get_all("Leave Application", {"employee": employee, "status": "Approved", "leave_type": ["in", lwps], "from_date": ["<=", leave_period.to_date], "to_date": [">=", leave_period.from_date]}, ["total_leave_days", "leave_type"])
+	leave_applications = frappe.db.get_all("Leave Application", {"employee": employee, "status": ["in", ["Approved", "Open"]], "leave_type": ["in", lwps], "from_date": ["<=", leave_period.to_date], "to_date": [">=", leave_period.from_date]}, ["total_leave_days", "leave_type"])
 
 	# Calculate total leave days consumed
 	total_leave_days = sum(application.total_leave_days for application in leave_applications)

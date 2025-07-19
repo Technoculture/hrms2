@@ -20,7 +20,11 @@ import BaseLayout from "@/components/BaseLayout.vue"
 import RequestPanel from "@/components/RequestPanel.vue"
 import EmployeesOnLeave from "@/components/EmployeesOnLeave.vue"
 import AttendanceIcon from "@/components/icons/AttendanceIcon.vue"
+import ShiftIcon from "@/components/icons/ShiftIcon.vue"
 import LeaveIcon from "@/components/icons/LeaveIcon.vue"
+import ExpenseIcon from "@/components/icons/ExpenseIcon.vue"
+import EmployeeAdvanceIcon from "@/components/icons/EmployeeAdvanceIcon.vue"
+import SalaryIcon from "@/components/icons/SalaryIcon.vue"
 
 const __ = inject("$translate")
 
