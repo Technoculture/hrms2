@@ -1,7 +1,35 @@
 <template>
-    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="#000000" viewBox="0 0 256 256">
-        <path
-            d="M224,128a96,96,0,0,1-94.71,96H128A95.38,95.38,0,0,1,62.1,197.8a8,8,0,0,1,11-11.63A80,80,0,1,0,71.43,71.39a3.07,3.07,0,0,1-.26.25L44.59,96H72a8,8,0,0,1,0,16H24a8,8,0,0,1-8-8V56a8,8,0,0,1,16,0V85.8L60.25,60A96,96,0,0,1,224,128Z">
-        </path>
-    </svg>
+	<svg
+		width="24"
+		height="24"
+		viewBox="0 0 24 24"
+		fill="none"
+		xmlns="http://www.w3.org/2000/svg"
+		class="w-6 h-6"
+	>
+		<path
+			d="M12 8V12L15 15"
+			stroke="currentColor"
+			stroke-width="2"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+		/>
+		<path
+			d="M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z"
+			stroke="currentColor"
+			stroke-width="2"
+		/>
+		<path
+			d="M8 2L8 6"
+			stroke="currentColor"
+			stroke-width="2"
+			stroke-linecap="round"
+		/>
+		<path
+			d="M16 2L16 6"
+			stroke="currentColor"
+			stroke-width="2"
+			stroke-linecap="round"
+		/>
+	</svg>
 </template>
