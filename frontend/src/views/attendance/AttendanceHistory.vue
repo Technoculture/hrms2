@@ -9,7 +9,7 @@
 							<button @click="goBack" class="p-1">
 								<FeatherIcon name="chevron-left" class="h-6 w-6 text-gray-700" />
 							</button>
-							<h1 class="text-xl font-semibold text-gray-900">{{ __('Time logs') }}</h1>
+							<h1 class="text-xl font-semibold text-gray-900">{{ __('Attendance History') }}</h1>
 						</div>
 						<div class="flex items-center gap-3">
 							<FeatherIcon name="bell" class="h-5 w-5 text-gray-500" />
