@@ -30,7 +30,7 @@
 			<!-- Clock In/Out Times -->
 			<div class="flex justify-between items-center">
 				<div class="flex-1">
-					<p class="text-xs text-gray-500">{{ __('Clock In') }}</p>
+					<p class="text-xs text-gray-500">{{ __('Check In') }}</p>
 					<div class="flex flex-col">
 						<p class="text-sm font-medium" :class="props.doc.late_entry ? 'text-red-600' : 'text-gray-900'">
 							{{ props.doc.clock_in_time || '--' }}
@@ -41,7 +41,7 @@
 					</div>
 				</div>
 				<div class="flex-1 text-right">
-					<p class="text-xs text-gray-500">{{ __('Clock Out') }}</p>
+					<p class="text-xs text-gray-500">{{ __('Check Out') }}</p>
 					<div class="flex flex-col items-end">
 						<p class="text-sm font-medium" :class="getMissingOutClass(props.doc)">
 							{{ getMissingOutText(props.doc) }}
