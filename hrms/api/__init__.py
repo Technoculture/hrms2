@@ -3,7 +3,7 @@ from frappe import _
 from frappe.model import get_permitted_fields
 from frappe.model.workflow import get_workflow_name
 from frappe.query_builder import Order
-from frappe.utils import add_days, date_diff, getdate, strip_html, get_time
+from frappe.utils import add_days, date_diff, getdate, strip_html, get_time, time_diff_in_hours
 import datetime
 from erpnext.setup.doctype.employee.employee import get_holiday_list_for_employee
 
@@ -909,3 +909,313 @@ def get_allowed_states_for_workflow(workflow: dict, user_id: str) -> list[str]:
 @frappe.whitelist()
 def get_permitted_fields_for_write(doctype: str) -> list[str]:
 	return get_permitted_fields(doctype, permission_type="write")
+
+@frappe.whitelist()	
+def get_attendance_history(employee: str, month: str) -> list[dict]:
+	"""
+	Get detailed attendance history for an employee for a specific month.
+	Gathers data from Employee Checkin, Attendance, Shift Assignment, Shift Type,
+	and Attendance Regularization doctypes.
+	
+	Args:
+		employee (str): Employee ID
+		month (str): Month in YYYY-MM format
+		
+	Returns:
+		list[dict]: List of attendance records with detailed information
+	"""
+	import frappe
+	from frappe.utils import getdate, get_first_day, get_last_day, add_days, format_time, time_diff_in_hours, format_datetime
+	from datetime import datetime, timedelta
+	import calendar
+
+	# Parse month and get date range
+	try:
+		year, month_num = map(int, month.split('-'))
+		start_date = get_first_day(getdate(f"{year}-{month_num:02d}-01"))
+		end_date = get_last_day(getdate(f"{year}-{month_num:02d}-01"))
+		# if year and month is the current month and year, then restrict end_date to today
+		if year == getdate().year and month_num == getdate().month:
+			end_date = getdate()
+	except (ValueError, TypeError):
+		frappe.throw("Invalid month format. Use YYYY-MM format.")
+	
+	attendance_history = []
+	holidays = get_holidays(employee, start_date, end_date)
+	
+	# Iterate through each day of the month
+	current_date = start_date
+	while current_date <= end_date:
+		date_str = current_date.strftime('%Y-%m-%d')
+		
+		# Get attendance record for this date
+		attendance = frappe.db.get_value(
+			"Attendance",
+			{
+				"employee": employee,
+				"attendance_date": current_date,
+				"docstatus": 1
+			},
+			[
+				"status", "working_hours", "late_entry", "early_exit", 
+				"in_time", "out_time", "shift", "leave_type"
+			],
+			as_dict=True
+		)
+		
+		# Get shift assignment for this date using SQL query
+		shift_assignment = frappe.db.sql("""
+			SELECT shift_type, start_date, end_date
+			FROM `tabShift Assignment`
+			WHERE employee = %s 
+				AND start_date <= %s 
+				AND (end_date >= %s OR end_date IS NULL)
+				AND docstatus = 1 
+			ORDER BY start_date DESC
+			LIMIT 1
+		""", (employee, current_date, current_date), as_dict=True)
+		
+		shift_assignment = shift_assignment[0] if shift_assignment else None
+		
+		# Get shift type details
+		shift_type = None
+		shift_start_time = None
+		shift_end_time = None
+		shift_name = None
+		
+		if shift_assignment:
+			shift_type_doc = frappe.db.get_value(
+				"Shift Type",
+				shift_assignment.shift_type,
+				["name", "start_time", "end_time"],
+				as_dict=True
+			)
+			if shift_type_doc:
+				shift_type = shift_type_doc
+				shift_name = shift_type_doc.name
+				shift_start_time = format_time(shift_type_doc.start_time, format_string="hh:mm") if shift_type_doc.start_time else None
+				shift_end_time = format_time(shift_type_doc.end_time, format_string="hh:mm") if shift_type_doc.end_time else None
+		# Get employee checkins for this date
+		checkins = frappe.get_all(
+			"Employee Checkin",
+			filters={
+				"employee": employee,
+				"time": ["between", [f"{date_str} 00:00:00", f"{date_str} 23:59:59"]]
+			},
+			fields=["log_type", "time", "device_id"],
+			order_by="time asc"
+		)
+		
+		# Process time logs and calculate clock in/out times
+		time_logs = []
+		clock_in_time = None
+		clock_out_time = None
+		clock_out_missing = False
+		swipe_missing_in = False
+		swipe_missing_out = False
+		
+		for checkin in checkins:
+			time_logs.append({
+				"log_type": checkin.log_type,
+				"time": format_datetime(checkin.time, format_string="hh:mm:ss"),
+				"missing": False
+			})
+			
+			if checkin.log_type == "IN" and not clock_in_time:
+				clock_in_time = format_datetime(checkin.time, format_string="hh:mm:ss")
+			elif checkin.log_type == "OUT":
+				clock_out_time = format_datetime(checkin.time, format_string="hh:mm:ss")
+		
+		# Check for missing swipes
+		if attendance and attendance.status == "Present":
+			if not clock_in_time:
+				swipe_missing_in = True
+			if not clock_out_time:
+				swipe_missing_out = True
+				clock_out_missing = True
+				time_logs.append({
+					"log_type": "OUT",
+					"time": "OUT missing",
+					"missing": True
+				})
+		
+		# Calculate late entry and early exit
+		late_entry = False
+		late_minutes = 0
+		early_exit = False
+		
+		if attendance:
+			# late_entry = attendance.late_entry or False
+			early_exit = attendance.early_exit or False
+			
+			if clock_in_time and shift_start_time: # TODO: handle this crap in a better way
+				try:
+					# Convert shift_start_time from string to time object if needed
+					if isinstance(shift_start_time, str):
+						# Try different time formats since '10:00' doesn't match '%H:%M:%S'
+						try:
+							shift_start_time = datetime.strptime(shift_start_time, "%H:%M").time()
+						except ValueError:
+							try:
+								shift_start_time = datetime.strptime(shift_start_time, "%I:%M %p").time()
+							except ValueError:
+								shift_start_time = datetime.strptime(shift_start_time, "%H:%M:%S").time()
+					
+					shift_start_datetime = datetime.combine(current_date, shift_start_time)
+					
+					# Convert clock_in_time to datetime object
+					try:
+						# Try parsing with the format used in format_datetime above
+						clock_in_datetime = datetime.strptime(f"{date_str} {clock_in_time}", "%Y-%m-%d %H:%M:%S")
+					except ValueError:
+						# If that fails, try alternative format
+						clock_in_datetime = datetime.strptime(f"{date_str} {clock_in_time}", "%Y-%m-%d %I:%M:%S %p")
+					
+					if clock_in_datetime > shift_start_datetime:
+						late_minutes = int((clock_in_datetime - shift_start_datetime).total_seconds() / 60)
+					# if late_minutes is greater than 15, then set late_entry to True
+					if late_minutes > 0:
+						late_entry = True
+					else:
+						late_entry = False
+				except (ValueError, TypeError) as e:
+					print("Error calculating late minutes:", e)
+					late_minutes = 0
+		
+		# Calculate working hours
+		effective_hours = "0h 0m"
+		gross_hours = "0h 0m"
+		
+		if attendance and attendance.working_hours:
+			hours = int(attendance.working_hours)
+			minutes = int((attendance.working_hours - hours) * 60)
+			effective_hours = f"{hours}h {minutes}m"
+			gross_hours = get_gross_hours(checkins)
+			# format gross_hours to hh:mm
+			hours = int(gross_hours)
+			minutes = int((gross_hours - hours) * 60)
+			gross_hours = f"{hours}h {minutes}m"
+		
+		# Determine penalties
+		penalties = [] # TODO: add penalties implementations
+		
+		# Check for attendance regularization pending
+		attendance_adjustment_pending = frappe.db.exists(
+			"Attendance Regularization",
+			{
+				"employee": employee,
+				"date": current_date,
+				"docstatus": 0  # Draft status indicates pending
+			}
+		)
+		
+		# Determine status
+		status = "Absent"  # Default
+		if attendance:
+			if attendance.status == "On Leave":
+				status = "Leave"
+			elif attendance.status == "Half Day":
+				status = "Half Day"
+			elif attendance.status == "Present":
+				status = "Present"
+			elif attendance.status == "Work From Home":
+				status = "Work From Home"
+			else:
+				status = attendance.status
+		else:
+			if holidays: # a dict of str:dict
+				if date_str in holidays.keys():
+					# find holiday with date_str in holidays
+					holiday = holidays[date_str]
+					if holiday["is_weekly_off"]:
+						status = "Week Off"
+					else:
+						status = "Holiday"
+
+		
+		# Build the attendance record
+		attendance_record = {
+			"date": date_str,
+			"status": status,
+			"shift_name": shift_name,
+			"shift_start_time": shift_start_time,
+			"shift_end_time": shift_end_time,
+			"clock_in_time": clock_in_time,
+			"clock_out_time": clock_out_time,
+			"clock_out_missing": clock_out_missing,
+			"late_entry": late_entry,
+			"late_minutes": late_minutes,
+			"early_exit": early_exit,
+			"effective_hours": effective_hours,
+			"gross_hours": gross_hours,
+			"penalties": penalties,
+			"attendance_adjustment_pending": bool(attendance_adjustment_pending),
+			"swipe_missing_in": swipe_missing_in,
+			"swipe_missing_out": swipe_missing_out,
+			"time_logs": time_logs
+		}
+		
+		attendance_history.append(attendance_record)
+		current_date = add_days(current_date, 1)
+	
+	return attendance_history
+
+
+@frappe.whitelist()
+def get_gross_hours(checkins: list) -> float:
+	"""
+	Get gross and effective hours from checkins
+	gross_hours = total time from first IN to last OUT
+	"""
+	total_hours = 0
+	first_in_time = None
+	last_out_time = None
+	for checkin in checkins:
+		if checkin.log_type == "IN":
+			if not first_in_time:
+				first_in_time = checkin.time
+	for checkin in checkins[::-1]:
+		if checkin.log_type == "OUT":
+			if not last_out_time:
+				last_out_time = checkin.time
+	if first_in_time and last_out_time:
+		total_hours = time_diff_in_hours(last_out_time, first_in_time)
+	return total_hours
+
+def get_holidays(employee: str,start_date: str, end_date: str) -> dict[str, dict]:
+	"""
+	Get holidays for an employee between start_date and end_date
+	Args:
+		employee (str): Employee ID
+		shift_type (str): Shift type ID
+		start_date (str): Start date in YYYY-MM-DD format
+		end_date (str): End date in YYYY-MM-DD format
+	Returns:
+		list[dict]: List of holidays with date and description, is_weekly_off, is_holiday
+	"""
+	holiday_list = {}
+	shift_assignment = frappe.db.sql("""
+		SELECT shift_type, start_date, end_date
+		FROM `tabShift Assignment`
+		WHERE employee = %s 
+			AND start_date <= %s 
+			AND (end_date >= %s OR end_date IS NULL)
+			AND docstatus = 1 
+		ORDER BY start_date DESC
+		LIMIT 1
+	""", (employee, start_date, end_date), as_dict=True)
+	shift_assignment = shift_assignment[0] if shift_assignment else None
+	if shift_assignment:
+		shift_type_doc = frappe.db.get_value(
+			"Shift Type",
+			shift_assignment.shift_type,
+			["name", "start_time", "end_time"],
+			as_dict=True
+		)
+		holiday_list = frappe.db.get_value("Shift Type", shift_type_doc.name, "holiday_list")
+	
+	if not holiday_list:
+		holiday_list = frappe.db.get_value("Employee", employee, "holiday_list")
+	holidays = frappe.get_all("Holiday", filters={"parent": holiday_list, "holiday_date": ("between", [start_date, end_date])}, fields=["holiday_date", "description", "weekly_off"])
+	holidays = {holiday.holiday_date.strftime("%Y-%m-%d"): {"description": holiday.description, "is_weekly_off": holiday.weekly_off} for holiday in holidays}
+	return holidays

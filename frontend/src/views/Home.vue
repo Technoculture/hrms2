@@ -62,7 +62,7 @@ const quickLinks = [
 	{
 		icon: markRaw(LeaveIcon),
 		title: __("Attendance History"),
-		route: "EmployeeCheckinListView",
+		route: "AttendanceHistoryView",
 	},
 ]
 </script>
