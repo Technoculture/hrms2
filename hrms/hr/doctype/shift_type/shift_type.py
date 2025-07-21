@@ -4,7 +4,7 @@
 
 from datetime import datetime, timedelta
 from itertools import groupby
-
+from datetime import time
 import frappe
 from frappe import _
 from frappe.model.document import Document
@@ -124,6 +124,15 @@ class ShiftType(Document):
 				in_time,
 				out_time,
 			) = self.get_attendance(single_shift_logs)
+			half_day_date = None
+			half_day_shift = None
+
+			if attendance_status == "Half Day" and in_time:
+				noon = time(12, 0)
+				if in_time.time() < noon:
+					half_day_shift = "First Half"
+				else:
+					half_day_shift = "Second Half"
 
 			mark_attendance_and_link_log(
 				single_shift_logs,
@@ -135,6 +144,7 @@ class ShiftType(Document):
 				in_time,
 				out_time,
 				self.name,
+				half_day_shift
 			)
 
 		# commit after processing checkin logs to avoid losing progress
