@@ -26,6 +26,11 @@
   "column_break_iewr",
   "encrypt_salary_slips_in_emails",
   "password_policy",
+  "salary_srlip_email_section",
+  "salary_slip_sender",
+  "salary_slip_email_template",
+  "column_break_gnrz",
+  "salary_slip_sender_email",
   "other_settings_section",
   "process_payroll_accounting_entry_based_on_employee",
   "column_break_zi9y"
@@ -172,13 +177,43 @@
    "fieldtype": "Link",
    "label": "Email Template",
    "options": "Email Template"
+  },
+  {
+   "fieldname": "salary_srlip_email_section",
+   "fieldtype": "Section Break",
+   "label": "Salary Slip Email"
+  },
+  {
+   "fieldname": "salary_slip_email_template",
+   "fieldtype": "Link",
+   "label": "Salary Slip Email Template",
+   "options": "Email Template"
+  },
+  {
+   "fieldname": "column_break_gnrz",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fetch_from": "salary_slip_sender.email_id",
+   "fetch_if_empty": 1,
+   "fieldname": "salary_slip_sender_email",
+   "fieldtype": "Data",
+   "label": "Salary Slip Sender Email",
+   "read_only": 1
+  },
+  {
+   "fieldname": "salary_slip_sender",
+   "fieldtype": "Link",
+   "label": "Salary Slip Sender",
+   "options": "Email Account"
   }
  ],
+ "grid_page_length": 50,
  "icon": "fa fa-cog",
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2024-10-18 17:12:02.044020",
+ "modified": "2025-07-21 12:29:15.652648",
  "modified_by": "Administrator",
  "module": "Payroll",
  "name": "Payroll Settings",
@@ -194,6 +229,7 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "ASC",
  "states": [],
