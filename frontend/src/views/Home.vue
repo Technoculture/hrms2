@@ -61,10 +61,14 @@ const quickLinks = [
 	// 	route: "SalarySlipsDashboard",
 	// },
 	{
-		icon: markRaw(LeaveIcon),
 		icon: markRaw(AttendanceIcon),
 		title: __("Attendance Summary"),
 		route: "AttendanceHistoryView",
+	},
+	{
+		icon: markRaw(RegularizationIcon),
+		title: __("Regularization History"),
+		route: "AttendanceRegularizationHistoryView",
 	},
 ]
 </script>

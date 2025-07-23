@@ -35,8 +35,14 @@
 								type="date"
 								:min="minDate"
 								:max="maxDate"
+								:disabled="isReadOnly"
 								@change="onDateChange"
-								class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+								:class="[
+									'w-full px-3 py-2 text-sm border rounded-lg',
+									isReadOnly 
+										? 'border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed' 
+										: 'border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+								]"
 							/>
 						</div>
 						<p class="text-xs text-gray-500 mt-1">
@@ -70,7 +76,7 @@
 									/>
 									<span class="text-sm font-medium">{{ record.log_type }}</span>
 								</div>
-								<span class="text-sm text-gray-600">{{ formatTimeWithAMPM(record.timestamp) }}</span>
+								<span class="text-sm text-gray-600">{{ formatTimeWithAMPM(record.log_time || record.timestamp) }}</span>
 							</div>
 						</div>
 					</div>
@@ -92,7 +98,13 @@
 										<input
 											v-model="record.in_time"
 											type="time"
-											class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+											:disabled="isReadOnly"
+											:class="[
+												'w-full px-3 py-2 text-sm border rounded-md',
+												isReadOnly 
+													? 'border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed' 
+													: 'border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+											]"
 											placeholder="--:--"
 										/>
 									</div>
@@ -103,14 +115,20 @@
 										<input
 											v-model="record.out_time"
 											type="time"
-											class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+											:disabled="isReadOnly"
+											:class="[
+												'w-full px-3 py-2 text-sm border rounded-md',
+												isReadOnly 
+													? 'border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed' 
+													: 'border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+											]"
 											placeholder="--:--"
 										/>
 									</div>
 								</div>
 								
 								<!-- Remove Record Button -->
-								<div v-if="inOutRecords.length > 1" class="flex justify-end mt-2">
+								<div v-if="inOutRecords.length > 1 && !isReadOnly" class="flex justify-end mt-2">
 									<button 
 										@click="removeRecord(index)"
 										class="text-red-600 text-xs font-medium hover:text-red-700"
@@ -127,6 +145,7 @@
 						
 						<!-- Add Record Button -->
 						<button 
+							v-if="!isReadOnly"
 							@click="addRecord"
 							class="flex items-center gap-2 text-blue-600 text-sm font-medium mt-3 hover:text-blue-700"
 						>
@@ -141,15 +160,21 @@
 						<textarea
 							v-model="reason"
 							rows="4"
-							class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-							:placeholder="__('Please provide a reason for the attendance regularization')"
+							:disabled="isReadOnly"
+							:class="[
+								'w-full px-3 py-2 text-sm border rounded-lg resize-none',
+								isReadOnly 
+									? 'border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed' 
+									: 'border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+							]"
+							:placeholder="isReadOnly ? '' : __('Please provide a reason for the attendance regularization')"
 						></textarea>
 					</div>
 
 				</div>
 
-				<!-- Submit Button -->
-				<div class="p-4 bg-white border-t border-gray-200">
+				<!-- Submit Button / Status Display -->
+				<div v-if="!isApproved && !isRejected" class="p-4 bg-white border-t border-gray-200">
 					<Button 
 						@click="submitForm"
 						:loading="submitting"
@@ -158,6 +183,15 @@
 					>
 						{{ __('Submit') }}
 					</Button>
+				</div>
+				
+				<!-- Status Display for Read-Only Mode -->
+				<div v-if="isApproved || isRejected || isPending">
+					<div class="text-center">
+						<div class="px-4 py-2 rounded-lg text-sm font-medium" :class="getStatusDisplayClass()">
+							{{ getStatusDisplayText() }}
+						</div>
+					</div>
 				</div>
 			</div>
 		</ion-content>
@@ -217,9 +251,28 @@ const existingRecords = createResource({
 	},
 })
 
+// API resource for loading existing regularization request
+const regularizationRequest = createResource({
+	url: "hrms.api.attendance_regularization.get_attendance_regularization_request",
+	makeParams() {
+		return {
+			name: props.id,
+		}
+	},
+	onSuccess(data) {
+		if (data && props.id) {
+			loadExistingData(data)
+		}
+	},
+})
+
 // Watch for date changes
 watch(selectedDate, (newDate) => {
 	if (newDate) {
+		// avoid in case of read only mode
+		if(props && props.id){
+			return
+		}
 		existingRecords.reload()
 	}
 })
@@ -299,6 +352,35 @@ function validateForm() {
 
 async function submitForm() {
 	try {
+		if(props && props.id){
+			const submitResource = createResource({
+				url: "hrms.api.attendance_regularization.submit_attendance_regularization",
+				params: {
+					name: props.id,
+					status: "Approved"
+				}
+			})
+			const response = await submitResource.reload()
+			// Check if the API returned an error
+			if (response.status === "error") {
+				if (response.type === "validation") {
+					throw new Error(response.message || __('Validation error occurred'))
+				} else {
+					throw new Error(response.message || __('Failed to submit request'))
+				}
+			}
+			
+			// Show success message and navigate back
+			toast({
+				title: __('Success'),
+				text: __('Attendance regularization request submitted successfully!'),
+				icon: "check-circle",
+				position: "bottom-center",
+				iconClasses: "text-green-500",
+			})
+			router.back()
+			return
+		}
 		validateForm()
 		submitting.value = true
 		
@@ -318,7 +400,7 @@ async function submitForm() {
 		
 		// Submit to API
 		const submitResource = createResource({
-			url: "hrms.api.attendance_regularization.submit_attendance_regularization",
+			url: "hrms.api.attendance_regularization.save_attendance_regularization",
 			params: formData,
 		})
 		
@@ -373,10 +455,75 @@ async function submitForm() {
 	}
 }
 
+// State for read-only mode
+const isReadOnly = ref(false)
+const isApproved = ref(false)
+const isRejected = ref(false)
+const isPending = ref(false)
+
+// Function to load existing data
+function loadExistingData(data) {
+	// Map API fields to form fields
+	selectedDate.value = data.date || ''
+	reason.value = data.regularisation_reasonn || ''
+	
+	// Load in/out records
+	if (data.in_out_records && data.in_out_records.length > 0) {
+		inOutRecords.value = data.in_out_records.map(record => ({
+			in_time: record.in_time || '',
+			out_time: record.out_time || ''
+		}))
+	}
+	
+	// Load existing checkins for display
+	if (data.custom_existing_checkins && data.custom_existing_checkins.length > 0) {
+		existingRecords.data = data.custom_existing_checkins.map(record => ({
+			log_type: record.log_type,
+			log_time: record.log_time
+		}))
+	}
+	
+	// Set form to read-only mode
+	isReadOnly.value = true
+	isApproved.value = data.docstatus === 1
+	isRejected.value = data.docstatus === 2
+	isPending.value = data.docstatus === 0
+}
+
+// Functions for status display in read-only mode
+function getStatusDisplayClass() {
+	if (!regularizationRequest.data) return 'bg-gray-100 text-gray-700'
+	
+	const docstatus = regularizationRequest.data.docstatus
+	switch (docstatus) {
+		case 1:
+			return 'bg-green-100 text-green-700'
+		case 2:
+			return 'bg-red-100 text-red-700'
+		case 0:
+		default:
+			return 'bg-orange-100 text-orange-700'
+	}
+}
+
+function getStatusDisplayText() {
+	if (!regularizationRequest.data) return __('Loading...')
+	
+	const docstatus = regularizationRequest.data.docstatus
+	switch (docstatus) {
+		case 1:
+			return __('Approved')
+		case 2:
+			return __('Rejected')
+		case 0:
+		default:
+			return __('Pending Approval')
+	}
+}
+
 // Initialize form if editing existing record
 if (props.id) {
-	// Load existing attendance request data
-	// This would be implemented based on your API structure
+	regularizationRequest.reload()
 }
 </script>
 

@@ -1308,3 +1308,26 @@ def get_employee_checkin_records(employee: str, date: str) -> list[dict]:
 	]
 
 	return checkins
+
+
+@frappe.whitelist()
+def get_attendance_regularization_requests(employee: str, filters: dict) -> list[dict]:
+	"""
+	Get attendance regularization requests for an employee
+	Args:
+		employee (str): Employee ID
+		filters (dict): Filters for the attendance regularization requests (approver or employee)
+	Returns:
+		list[dict]: List of attendance regularization requests
+	"""
+	attendance_regularization_requests = frappe.get_all(
+		"Attendance Regularization",
+		filters=filters
+	)
+	# get all the data
+	attendance_regularization_requests_data = []
+	for request in attendance_regularization_requests:
+		request_doc = frappe.get_doc("Attendance Regularization", request.name)
+		# Cross map as per the vue app requirements
+		attendance_regularization_requests_data.append(request_doc.as_dict())
+	return attendance_regularization_requests_data

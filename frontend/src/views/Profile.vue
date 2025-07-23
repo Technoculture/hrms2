@@ -192,7 +192,8 @@ const profileLinks = [
 			"cell_number",
 			"personal_email",
 			"company_email",
-			"preferred_email",
+			"prefered_email",
+			"custom_company_mobile"
 		],
 	},
 	{

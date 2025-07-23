@@ -23,6 +23,11 @@ export const LEAVE_FIELDS = [
 		fieldtype: "Check",
 	},
 	{
+		fieldname: "custom_half_day_session",
+		label: "Half Day Session",
+		fieldtype: "Select",
+	},
+	{
 		fieldname: "half_day_date",
 		label: "Half Day Date",
 		fieldtype: "Date",
