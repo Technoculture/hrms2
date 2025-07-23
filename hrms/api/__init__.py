@@ -1343,6 +1343,7 @@ def get_attendance_regularization_requests(employee: str, filters: dict) -> list
 	attendance_regularization_requests = frappe.get_all(
 		"Attendance Regularization",
 		filters=usable_filters,
-		fields="*"
+		fields="*",
+		limit=200
 	)
 	return attendance_regularization_requests

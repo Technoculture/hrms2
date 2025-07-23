@@ -1,5 +1,5 @@
 <template>
-	<div class="bg-white rounded-lg border border-gray-200 p-4 cursor-pointer hover:bg-gray-50 transition-colors">
+	<div class="bg-white rounded-lg border border-gray-200 p-4 cursor-pointer hover:bg-gray-50 transition-colors" :class="props.extraClass">
 		<div class="flex items-center justify-between">
 			<div class="flex items-center gap-3 flex-1">
 				<!-- Calendar Icon -->

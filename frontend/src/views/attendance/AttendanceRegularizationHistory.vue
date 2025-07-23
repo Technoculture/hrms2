@@ -69,7 +69,7 @@
 							/>
 						</div>
 						
-						<div v-else>
+						<div v-else class="flex flex-col gap-3 mb-0 pb-0">
 							<AttendanceRegularizationItem 
 								v-for="request in myRequests.data" 
 								:key="request.name"
@@ -91,7 +91,7 @@
 							/>
 						</div>
 						
-						<div v-else>
+						<div v-else class="flex flex-col gap-3 mb-0 pb-0">
 							<AttendanceRegularizationItem 
 								v-for="request in teamRequests.data" 
 								:key="request.name"

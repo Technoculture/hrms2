@@ -65,10 +65,10 @@ const quickLinks = [
 		title: __("Attendance Summary"),
 		route: "AttendanceHistoryView",
 	},
-	{
-		icon: markRaw(RegularizationIcon),
-		title: __("Regularization History"),
-		route: "AttendanceRegularizationHistoryView",
-	},
+	// {
+	// 	icon: markRaw(RegularizationIcon),
+	// 	title: __("Regularization History"),
+	// 	route: "AttendanceRegularizationHistoryView",
+	// },
 ]
 </script>
