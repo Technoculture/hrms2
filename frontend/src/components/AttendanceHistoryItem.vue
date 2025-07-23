@@ -14,8 +14,8 @@
 			</div>
 		</div>
 
-		<!-- Week Off, Holiday, or Leave (but not Half Day) -->
-		<div v-if="['Week Off', 'Holiday', 'Leave'].includes(props.doc.status)" class="text-center py-3">
+		<!-- Week Off, Holiday, or Leave (without clock data) -->
+		<div v-if="['Week Off', 'Holiday', 'Leave'].includes(props.doc.status) && !hasClockData(props.doc)" class="text-center py-3">
 			<div class="px-3 py-1 rounded-full text-[10px] font-medium" :class="getStatusBadgeClass(props.doc.status)">
 				{{ getStatusBadgeText(props.doc.status) }}
 			</div>
@@ -27,15 +27,16 @@
 		</div>
 
 		<!-- Clock In/Out Details -->
-		<div v-else-if="props.doc.clock_in_time || props.doc.clock_out_time || props.doc.status === 'Half Day'"
+		<div v-else-if="hasClockData(props.doc) || props.doc.status === 'Half Day' || ['Week Off', 'Holiday', 'Leave'].includes(props.doc.status)"
 			class="space-y-2">
 			
-			<!-- Half Day Status (if applicable) -->
-			<div v-if="props.doc.status === 'Half Day'" class="text-center py-2">
-				<div class="px-3 py-1 rounded-full text-[10px] font-medium bg-yellow-100 text-yellow-700">
-					{{ __('HALF DAY') }}
+			<!-- Status Badge (for Half Day, Leave, Week Off, Holiday with clock data) -->
+			<div v-if="['Half Day', 'Leave', 'Week Off', 'Holiday'].includes(props.doc.status)" class="text-center py-2">
+				<div class="px-3 py-1 rounded-full text-[10px] font-medium" :class="getStatusBadgeClass(props.doc.status)">
+					{{ getStatusBadgeText(props.doc.status) }}
 				</div>
-				<div v-if="props.doc.half_day_session" class="mt-1">
+				<!-- Half Day Session Info -->
+				<div v-if="props.doc.status === 'Half Day' && props.doc.half_day_session" class="mt-1">
 					<div class="px-2 py-0.5 rounded text-[9px] font-medium bg-blue-50 text-blue-700">
 						{{ getHalfDaySessionText(props.doc.half_day_session) }}
 					</div>
@@ -231,6 +232,15 @@ function getMissingOutText(doc) {
 		return __('MISSING')
 	}
 	return doc.clock_out_time || '--'
+}
+
+function hasClockData(doc) {
+	// Check if the record has any clock-in/out data, working hours, or time logs
+	return doc.clock_in_time || 
+		   doc.clock_out_time || 
+		   (doc.effective_hours && doc.effective_hours !== '0h 0m') ||
+		   (doc.gross_hours && doc.gross_hours !== '0h 0m') ||
+		   (doc.time_logs && doc.time_logs.length > 0)
 }
 
 function toggleExpand() {

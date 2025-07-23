@@ -1085,6 +1085,8 @@ def get_attendance_history(employee: str, month: str) -> list[dict]:
 		# Calculate working hours
 		effective_hours = "0h 0m"
 		gross_hours = "0h 0m"
+		effective_hours = convert_hours_to_string(get_effective_hours(checkins))
+		gross_hours = convert_hours_to_string(get_gross_hours(checkins))
 		
 		if attendance and attendance.working_hours:
 			hours = int(attendance.working_hours)
