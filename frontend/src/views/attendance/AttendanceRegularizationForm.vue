@@ -33,13 +33,14 @@
 							<input
 								v-model="selectedDate"
 								type="date"
+								:min="minDate"
 								:max="maxDate"
 								@change="onDateChange"
 								class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
 							/>
 						</div>
 						<p class="text-xs text-gray-500 mt-1">
-							{{ __('Only dates up to today in the current month are allowed') }}
+							{{ __('Only dates from last week and current week until yesterday are allowed') }}
 						</p>
 					</div>
 
@@ -191,7 +192,14 @@ const inOutRecords = ref([
 ])
 
 // Computed values
-const maxDate = computed(() => dayjs().format('YYYY-MM-DD'))
+const maxDate = computed(() => dayjs().subtract(1, 'day').format('YYYY-MM-DD')) // Yesterday
+const minDate = computed(() => {
+	// Calculate the start of last week (Monday of last week)
+	const today = dayjs()
+	const currentWeekStart = today.startOf('week').add(1, 'day') // Monday of current week
+	const lastWeekStart = currentWeekStart.subtract(1, 'week') // Monday of last week
+	return lastWeekStart.format('YYYY-MM-DD')
+})
 
 const formatSelectedDate = computed(() => {
 	if (!selectedDate.value) return ''
