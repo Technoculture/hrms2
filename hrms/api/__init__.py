@@ -1320,14 +1320,29 @@ def get_attendance_regularization_requests(employee: str, filters: dict) -> list
 	Returns:
 		list[dict]: List of attendance regularization requests
 	"""
+	usable_filters = {}
+	if filters.get("employee"):
+		usable_filters["employee"] = filters["employee"]
+	# when approver is provided, then get the employees under the approver
+	if filters.get("approver"):
+		employees = frappe.get_all(
+			"Employee",
+			filters={
+				"user_id": ["!=", filters["approver"]]
+			},
+			or_filters=[
+				{"reports_to": filters["approver"]},
+				{"custom_reporting_manager_l1": filters["approver"]},
+				{"custom_reporting_manager_l2": filters["approver"]},
+				{"leave_approver": filters["approver"]}
+			],
+			fields=["name"]
+		)
+		employee_list = [e["name"] for e in employees]
+		usable_filters["employee"] = ["in", employee_list]
 	attendance_regularization_requests = frappe.get_all(
 		"Attendance Regularization",
-		filters=filters
+		filters=usable_filters,
+		fields="*"
 	)
-	# get all the data
-	attendance_regularization_requests_data = []
-	for request in attendance_regularization_requests:
-		request_doc = frappe.get_doc("Attendance Regularization", request.name)
-		# Cross map as per the vue app requirements
-		attendance_regularization_requests_data.append(request_doc.as_dict())
-	return attendance_regularization_requests_data
+	return attendance_regularization_requests

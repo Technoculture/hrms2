@@ -65,8 +65,7 @@
 						
 						<div v-else-if="!myRequests.data || myRequests.data.length === 0" class="text-center py-8">
 							<EmptyState 
-								:title="__('No regularization requests')"
-								:description="__('You have not submitted any attendance regularization requests')"
+								message="You have not submitted any attendance regularization requests"
 							/>
 						</div>
 						
@@ -88,8 +87,7 @@
 						
 						<div v-else-if="!teamRequests.data || teamRequests.data.length === 0" class="text-center py-8">
 							<EmptyState 
-								:title="__('No team requests')"
-								:description="__('No attendance regularization requests from your team')"
+								message="No attendance regularization requests from your team"
 							/>
 						</div>
 						
