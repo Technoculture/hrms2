@@ -65,6 +65,11 @@
 				<p class="text-orange-700 text-xs font-medium">{{ __('Attendance Adjustment Pending approval') }}</p>
 			</div>
 
+			<!-- Attendance Adjusted -->
+			<div v-if="props.doc.attendance_adjusted" class="bg-green-50 border border-green-200 rounded-md p-2">
+				<p class="text-green-700 text-xs font-medium">{{ __('Attendance Adjusted') }}</p>
+			</div>
+
 			<!-- Working Hours -->
 			<div class="flex justify-between items-center pt-2 border-t border-gray-100">
 				<div>

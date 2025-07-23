@@ -69,7 +69,7 @@
 									/>
 									<span class="text-sm font-medium">{{ record.log_type }}</span>
 								</div>
-								<span class="text-sm text-gray-600">{{ record.time }}</span>
+								<span class="text-sm text-gray-600">{{ formatTimeWithAMPM(record.timestamp) }}</span>
 							</div>
 						</div>
 					</div>
@@ -235,6 +235,37 @@ function removeRecord(index) {
 	if (inOutRecords.value.length > 1) {
 		inOutRecords.value.splice(index, 1)
 	}
+}
+
+function formatTimeWithAMPM(timestamp) {
+	if (!timestamp) return '--'
+	
+	// If the timestamp already contains AM/PM, return as is
+	if (timestamp.includes('AM') || timestamp.includes('PM')) {
+		return timestamp
+	}
+	
+	// Parse timestamp format like "2025-07-21 10:00:19" or "2025-07-21 19:25:05"
+	let timeString = timestamp
+	
+	// If it's a full timestamp, extract the time part
+	if (timestamp.includes(' ')) {
+		timeString = timestamp.split(' ')[1]
+	}
+	
+	// Parse time string (format like "14:30:00" or "10:00:19")
+	const timeParts = timeString.split(':')
+	if (timeParts.length < 2) return timestamp
+	
+	let hours = parseInt(timeParts[0])
+	const minutes = timeParts[1]
+	
+	// Convert to 12-hour format
+	const ampm = hours >= 12 ? 'PM' : 'AM'
+	hours = hours % 12
+	hours = hours ? hours : 12 // 0 should be 12
+	
+	return `${hours}:${minutes} ${ampm}`
 }
 
 function validateForm() {

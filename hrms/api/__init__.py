@@ -1108,6 +1108,15 @@ def get_attendance_history(employee: str, month: str) -> list[dict]:
 				"docstatus": 0  # Draft status indicates pending
 			}
 		)
+		attendance_adjustment_approved = frappe.db.exists(
+			"Attendance Regularization",
+			{
+				"employee": employee,
+				"date": current_date,
+				"docstatus": 1  # Approved status indicates approved
+			}
+		)
+
 		
 		# Determine status
 		status = "Absent"  # Default
@@ -1150,6 +1159,7 @@ def get_attendance_history(employee: str, month: str) -> list[dict]:
 			"gross_hours": gross_hours,
 			"penalties": penalties,
 			"attendance_adjustment_pending": bool(attendance_adjustment_pending),
+			"attendance_adjusted": bool(attendance_adjustment_approved),
 			"swipe_missing_in": swipe_missing_in,
 			"swipe_missing_out": swipe_missing_out,
 			"time_logs": time_logs
