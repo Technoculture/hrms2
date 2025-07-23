@@ -8,12 +8,13 @@
 					{{ props.doc.shift_name }} ({{ props.doc.shift_start_time }} - {{ props.doc.shift_end_time }})
 				</p>
 			</div>
-			<div v-if="getStatusInfo(props.doc).label" class="px-2 py-0.5 rounded-full text-[10px] font-medium" :class="getStatusInfo(props.doc).class">
+			<div v-if="getStatusInfo(props.doc).label" class="px-2 py-0.5 rounded-full text-[10px] font-medium"
+				:class="getStatusInfo(props.doc).class">
 				{{ getStatusInfo(props.doc).label }}
 			</div>
 		</div>
 
-		<!-- Week Off, Holiday, or Leave -->
+		<!-- Week Off, Holiday, or Leave (but not Half Day) -->
 		<div v-if="['Week Off', 'Holiday', 'Leave'].includes(props.doc.status)" class="text-center py-3">
 			<div class="px-3 py-1 rounded-full text-[10px] font-medium" :class="getStatusBadgeClass(props.doc.status)">
 				{{ getStatusBadgeText(props.doc.status) }}
@@ -26,7 +27,21 @@
 		</div>
 
 		<!-- Clock In/Out Details -->
-		<div v-else-if="props.doc.clock_in_time || props.doc.clock_out_time" class="space-y-2">
+		<div v-else-if="props.doc.clock_in_time || props.doc.clock_out_time || props.doc.status === 'Half Day'"
+			class="space-y-2">
+			
+			<!-- Half Day Status (if applicable) -->
+			<div v-if="props.doc.status === 'Half Day'" class="text-center py-2">
+				<div class="px-3 py-1 rounded-full text-[10px] font-medium bg-yellow-100 text-yellow-700">
+					{{ __('HALF DAY') }}
+				</div>
+				<div v-if="props.doc.half_day_session" class="mt-1">
+					<div class="px-2 py-0.5 rounded text-[9px] font-medium bg-blue-50 text-blue-700">
+						{{ getHalfDaySessionText(props.doc.half_day_session) }}
+					</div>
+				</div>
+			</div>
+			
 			<!-- Clock In/Out Times -->
 			<div class="flex justify-between items-center">
 				<div class="flex-1">
@@ -54,14 +69,16 @@
 			</div>
 
 			<!-- Penalties -->
-			<div v-if="props.doc.penalties && props.doc.penalties.length > 0" class="bg-red-50 border border-red-200 rounded-md p-2">
+			<div v-if="props.doc.penalties && props.doc.penalties.length > 0"
+				class="bg-red-50 border border-red-200 rounded-md p-2">
 				<p class="text-red-700 text-xs font-medium">
 					{{ props.doc.penalties.length }} {{ props.doc.penalties.length === 1 ? __('Penalty has been recorded') : __('Penalties have been recorded') }}
 				</p>
 			</div>
 
 			<!-- Attendance Adjustment -->
-			<div v-if="props.doc.attendance_adjustment_pending" class="bg-orange-50 border border-orange-200 rounded-md p-2">
+			<div v-if="props.doc.attendance_adjustment_pending"
+				class="bg-orange-50 border border-orange-200 rounded-md p-2">
 				<p class="text-orange-700 text-xs font-medium">{{ __('Attendance Adjustment Pending approval') }}</p>
 			</div>
 
@@ -84,14 +101,8 @@
 
 			<!-- Expand Button -->
 			<div v-if="props.doc.time_logs && props.doc.time_logs.length > 0" class="flex justify-center pt-2">
-				<button 
-					@click="toggleExpand"
-					class="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
-				>
-					<FeatherIcon 
-						:name="isExpanded ? 'chevron-up' : 'chevron-down'" 
-						class="h-3 w-3" 
-					/>
+				<button @click="toggleExpand" class="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700">
+					<FeatherIcon :name="isExpanded ? 'chevron-up' : 'chevron-down'" class="h-3 w-3" />
 					{{ isExpanded ? __('Hide Details') : __('Show Details') }}
 				</button>
 			</div>
@@ -101,11 +112,8 @@
 				<h4 class="text-xs font-medium text-gray-700 mb-2 uppercase">{{ __('TIME LOGS') }}</h4>
 				<div class="space-y-1">
 					<div v-for="(log, index) in props.doc.time_logs" :key="index" class="flex items-center gap-2">
-						<FeatherIcon 
-							:name="log.log_type === 'IN' ? 'arrow-down-right' : 'arrow-up-right'" 
-							:class="log.log_type === 'IN' ? 'text-green-600' : 'text-red-600'"
-							class="h-3 w-3" 
-						/>
+						<FeatherIcon :name="log.log_type === 'IN' ? 'arrow-down-right' : 'arrow-up-right'"
+							:class="log.log_type === 'IN' ? 'text-green-600' : 'text-red-600'" class="h-3 w-3" />
 						<span class="text-xs text-gray-700">
 							{{ log.time }}
 							<span v-if="log.missing" class="text-red-600 ml-1">{{ __('missing') }}</span>
@@ -138,11 +146,11 @@ const isExpanded = ref(false)
 function formatDate(date) {
 	const today = dayjs()
 	const targetDate = dayjs(date)
-	
+
 	if (targetDate.isSame(today, 'day')) {
 		return `${targetDate.format('ddd, D')} (Today)`
 	}
-	
+
 	return targetDate.format('ddd, D')
 }
 
@@ -162,7 +170,7 @@ function getStatusInfo(doc) {
 	} else if (doc.status === 'Present' && doc.clock_in_time && doc.clock_out_time) {
 		return { label: __('ON TIME'), class: 'bg-green-100 text-green-700' }
 	}
-	
+
 	return { label: '', class: '' }
 }
 
@@ -174,6 +182,8 @@ function getStatusBadgeClass(status) {
 			return 'bg-blue-100 text-blue-700'
 		case 'Leave':
 			return 'bg-green-100 text-green-700'
+		case 'Half Day':
+			return 'bg-yellow-100 text-yellow-700'
 		default:
 			return 'bg-gray-100 text-gray-700'
 	}
@@ -187,8 +197,25 @@ function getStatusBadgeText(status) {
 			return __('HOLIDAY')
 		case 'Leave':
 			return __('LEAVE')
+		case 'Half Day':
+			return __('HALF DAY')
 		default:
 			return status.toUpperCase()
+	}
+}
+
+function getHalfDaySessionText(session) {
+	switch (session) {
+		case 'First Half':
+		case 'FIRST_HALF':
+		case 'first_half':
+			return __('First Half')
+		case 'Second Half':
+		case 'SECOND_HALF':
+		case 'second_half':
+			return __('Second Half')
+		default:
+			return session
 	}
 }
 

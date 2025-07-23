@@ -1092,9 +1092,7 @@ def get_attendance_history(employee: str, month: str) -> list[dict]:
 			effective_hours = f"{hours}h {minutes}m"
 			gross_hours = get_gross_hours(checkins)
 			# format gross_hours to hh:mm
-			hours = int(gross_hours)
-			minutes = int((gross_hours - hours) * 60)
-			gross_hours = f"{hours}h {minutes}m"
+			gross_hours = convert_hours_to_string(gross_hours)
 		
 		# Determine penalties
 		penalties = [] # TODO: add penalties implementations
@@ -1140,12 +1138,34 @@ def get_attendance_history(employee: str, month: str) -> list[dict]:
 						status = "Week Off"
 					else:
 						status = "Holiday"
-
-		
+		# if attendance.status if half day, then get the half day session from the leave application and manually calculate the gross and effective hours
+		half_day_session = None
+		print("attendance",current_date, attendance.status if attendance else None)
+		if attendance and attendance.status == "Half Day":
+			if_leave_application = frappe.db.exists(
+				"Leave Application",
+				{
+					"employee": employee,
+					"from_date": ["<=", current_date],
+					"to_date": [">=", current_date],
+					"status": "Approved",
+					"half_day": 1,
+					"half_day_date": current_date,
+					"docstatus": 1
+				}
+			)
+			if if_leave_application:
+				leave_application = frappe.get_doc("Leave Application", if_leave_application)
+				if leave_application.status == "Approved":
+					status = "Half Day"
+					half_day_session = leave_application.custom_half_day_session
+					gross_hours = convert_hours_to_string(get_gross_hours(checkins))
+					effective_hours = convert_hours_to_string(get_effective_hours(checkins))
 		# Build the attendance record
 		attendance_record = {
 			"date": date_str,
 			"status": status,
+			"half_day_session": half_day_session,
 			"shift_name": shift_name,
 			"shift_start_time": shift_start_time,
 			"shift_end_time": shift_end_time,
@@ -1170,6 +1190,16 @@ def get_attendance_history(employee: str, month: str) -> list[dict]:
 	
 	return attendance_history
 
+def convert_hours_to_string(hours: float | None) -> str:
+	"""
+	Convert hours to string
+	hours: float or None
+	"""
+	if hours is None:
+		return "0h 0m"
+	hours = int(hours)
+	minutes = int((hours - hours) * 60)
+	return f"{hours}h {minutes}m"
 
 @frappe.whitelist()
 def get_gross_hours(checkins: list) -> float:
@@ -1191,6 +1221,20 @@ def get_gross_hours(checkins: list) -> float:
 	if first_in_time and last_out_time:
 		total_hours = time_diff_in_hours(last_out_time, first_in_time)
 	return total_hours
+
+def get_effective_hours(checkins: list) -> float:
+	"""
+	Get effective hours from checkins
+	effective_hours = sum of the pairs of IN and OUT
+	"""
+	effective_hours = 0
+	for i in range(0, len(checkins)-1, 2):
+		if checkins[i].log_type == "IN" and checkins[i+1].log_type == "OUT":
+			effective_hours += time_diff_in_hours(checkins[i+1].time, checkins[i].time)
+		else:
+			effective_hours += time_diff_in_hours(checkins[i+1].time, checkins[i].time)
+	
+	return effective_hours
 
 def get_holidays(employee: str,start_date: str, end_date: str) -> dict[str, dict]:
 	"""
