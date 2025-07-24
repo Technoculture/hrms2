@@ -37,18 +37,46 @@
 						}"
 					>
 						<div 
-							v-if="getEventOnDate(index) === 'First Half'" 
+							v-if="getEventOnDate(index) === 'FIRST HALF'" 
 							class="absolute inset-0 rounded-full overflow-hidden"
 						>
 							<div class="h-full w-1/2 bg-yellow-200 absolute left-0"></div>
 							<div class="h-full w-1/2 bg-green-200 absolute right-0"></div>
 						</div>
 						<div 
-							v-if="getEventOnDate(index) === 'Second Half'" 
+							v-if="getEventOnDate(index) === 'FIRST HALF HOLIDAY'" 
+							class="absolute inset-0 rounded-full overflow-hidden"
+						>
+							<div class="h-full w-1/2 bg-green-200 absolute left-0"></div>
+							<div class="h-full w-1/2 bg-gray-300 absolute right-0"></div>
+						</div>
+						<div 
+							v-if="getEventOnDate(index) === 'SECOND HALF HOLIDAY'" 
+							class="absolute inset-0 rounded-full overflow-hidden"
+						>
+							<div class="h-full w-1/2 bg-gray-300 absolute left-0"></div>
+							<div class="h-full w-1/2 bg-green-200 absolute right-0"></div>
+						</div>
+						<div 
+							v-if="getEventOnDate(index) === 'SECOND HALF'" 
 							class="absolute inset-0 rounded-full overflow-hidden"
 						>
 							<div class="h-full w-1/2 bg-green-200 absolute left-0"></div>
 							<div class="h-full w-1/2 bg-yellow-200 absolute right-0"></div>
+						</div>
+						<div 
+							v-if="getEventOnDate(index) === 'SECOND HALF OPEN'" 
+							class="absolute inset-0 rounded-full overflow-hidden"
+						>
+							<div class="h-full w-1/2 bg-white-200 absolute left-0"></div>
+							<div class="h-full w-1/2 bg-blue-300 absolute right-0"></div>
+						</div>
+						<div 
+							v-if="getEventOnDate(index) === 'FIRST HALF OPEN'" 
+							class="absolute inset-0 rounded-full overflow-hidden"
+						>
+							<div class="h-full w-1/2 bg-blue-300 absolute left-0"></div>
+							<div class="h-full w-1/2 bg-white-200 absolute right-0"></div>
 						</div>
 						<span class="text-gray-800 text-sm font-medium m-auto z-10">
 							{{ index }}
@@ -116,11 +144,11 @@ const summary = computed(() => {
 		if (updatedStatus in summary) {
 			summary[updatedStatus] += 1
 		} else {
-			if (updatedStatus !== "First Half" && updatedStatus !== "Second Half") {
+			if (updatedStatus !== "FIRST HALF" && updatedStatus !== "SECOND HALF" && updatedStatus !== "FIRST HALF OPEN" && updatedStatus !== "SECOND HALF OPEN") {
 				summary[updatedStatus] = 1
 			}
 		}
-		if (updatedStatus === "First Half" || updatedStatus === "Second Half") {
+		if (updatedStatus === "FIRST HALF" || updatedStatus === "SECOND HALF") {
 			if ("Half Day" in summary) {
 				summary["Half Day"] += 1
 			} else {
@@ -137,6 +165,21 @@ const summary = computed(() => {
 				summary["On Leave"] = 0.5
 			}
 		}
+		if (updatedStatus === "FIRST HALF HOLIDAY" || updatedStatus === "SECOND HALF HOLIDAY") {
+			if ("Present" in summary) {
+				summary["Present"] += 0.5
+			} else {
+				summary["Present"] = 0.5
+			}
+		}
+		if (updatedStatus === "FIRST HALF OPEN" || updatedStatus === "SECOND HALF OPEN") {
+			if ("On Leave" in summary) {
+				summary["On Leave"] += 0.5
+			} else {
+				summary["On Leave"] = 0.5
+			}
+		}
+
 	}
 
 	return summary

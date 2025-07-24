@@ -123,8 +123,8 @@ def get_attendance_calendar_events(employee: str, from_date: str, to_date: str) 
 	holidays = get_holidays_for_calendar(employee, from_date, to_date)
 	attendance = get_attendance_for_calendar(employee, from_date, to_date)
 	events = {}
-	open_leave_application_dates = get_open_leave_application_dates(employee, from_date, to_date)
-
+	open_leave_applications = get_open_leave_application_dates(employee, from_date, to_date)
+	open_leave_application_dates = [date for date in open_leave_applications.keys()]
 	date = getdate(from_date)
 	while date_diff(to_date, date) >= 0:
 		date_str = date.strftime("%Y-%m-%d")
@@ -133,20 +133,35 @@ def get_attendance_calendar_events(employee: str, from_date: str, to_date: str) 
 		elif date in holidays:
 			events[date_str] = "Holiday"
 		elif date_str in open_leave_application_dates:
-			events[date_str] = "On Leave"
+			events[date_str] = open_leave_applications[date_str]["status"]
+		date = add_days(date, 1)
+	# iterate over the dates again to append Holiday if it's a holiday
+	date = getdate(from_date)
+	strf_holidays = [date.strftime("%Y-%m-%d") for date in holidays]
+	while date_diff(to_date, date) >= 0:
+		date_str = date.strftime("%Y-%m-%d")
+		if date_str in strf_holidays:
+			if events[date_str] == "FIRST HALF" or events[date_str] == "SECOND HALF":
+				events[date_str] = "FIRST HALF HOLIDAY"
+			elif events[date_str] == "FIRST HALF OPEN" or events[date_str] == "SECOND HALF OPEN":
+				events[date_str] = "SECOND HALF HOLIDAY"
 		date = add_days(date, 1)
 
 
 	return events
 
 def get_open_leave_application_dates(employee: str, from_date: str, to_date: str) -> list[str]:
-	leave_applications = frappe.get_all("Leave Application", {"employee": employee, "status": "Open", "from_date": ["<=", to_date], "to_date": [">=", from_date]}, ["from_date", "to_date"])
-	dates = []
+	leave_applications = frappe.get_all("Leave Application", {"employee": employee, "status": "Open", "from_date": ["<=", to_date], "to_date": [">=", from_date]}, "*")
+	dates = {}
 	for leave_application in leave_applications:
-		dates.extend(get_dates_from_date_range(leave_application.from_date, leave_application.to_date))
-	# get holidays in the date range
-	holidays = get_holidays_for_calendar(employee, from_date, to_date)
-	dates = [date for date in dates if date not in holidays]
+		leave_dates = get_dates_from_date_range(leave_application.from_date, leave_application.to_date)
+		# iterate over the dates and get more info about the leave for each date
+		for date in leave_dates:
+			dates[date] = {
+				"leave_application": leave_application.name,
+				"leave_type": leave_application.leave_type,
+				"status": (leave_application.custom_half_day_session + " OPEN") if leave_application.half_day and str(leave_application.half_day_date) == date else "On Leave"
+			}
 	return dates
 
 def get_dates_from_date_range(from_date: str, to_date: str) -> list[str]:
@@ -173,9 +188,9 @@ def get_attendance_for_calendar(employee: str, from_date: str, to_date: str) -> 
 				# get the leave application
 				leave_session = frappe.db.get_value("Leave Application", leave_application, "custom_half_day_session")
 				if leave_session == "FIRST HALF":
-					d["status"] = "First Half"
+					d["status"] = "FIRST HALF"
 				elif leave_session == "SECOND HALF":
-					d["status"] = "Second Half"
+					d["status"] = "SECOND HALF"
 				continue
 			# get the start time and end time of the shift
 			shift = d.get("shift")
@@ -197,14 +212,14 @@ def get_attendance_for_calendar(employee: str, from_date: str, to_date: str) -> 
 				mid_seconds = (start_seconds + end_seconds) / 2
 				mid_day_time = datetime.time(int(mid_seconds // 3600), int((mid_seconds % 3600) // 60), int(mid_seconds % 60))
 				if out_time < mid_day_time:
-					d["status"] = "First Half"
+					d["status"] = "SECOND HALF"
 				# if in_time is more towards the end time, then it's second half
 				elif in_time > mid_day_time:
-					d["status"] = "Second Half"
+					d["status"] = "FIRST HALF"
 				else:
-					d["status"] = "First Half"
+					d["status"] = "SECOND HALF"
 			else:
-				d["status"] = "First Half"
+				d["status"] = "SECOND HALF"
 	return {d["attendance_date"]: d["status"] for d in attendance}
 
 

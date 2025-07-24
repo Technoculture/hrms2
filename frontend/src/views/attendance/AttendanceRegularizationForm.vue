@@ -11,12 +11,12 @@
 							</button>
 							<h1 class="text-xl font-semibold text-gray-900">{{ __('Attendance Regularization') }}</h1>
 						</div>
-						<div class="flex items-center gap-3">
+						<!-- <div class="flex items-center gap-3">
 							<FeatherIcon name="bell" class="h-5 w-5 text-gray-500" />
 							<div class="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
 								<span class="text-sm font-medium text-gray-600">P</span>
 							</div>
-						</div>
+						</div> -->
 					</div>
 				</div>
 			</div>
