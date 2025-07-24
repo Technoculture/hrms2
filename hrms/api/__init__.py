@@ -1157,7 +1157,6 @@ def get_attendance_history(employee: str, month: str) -> list[dict]:
 						status = "Holiday"
 		# if attendance.status if half day, then get the half day session from the leave application and manually calculate the gross and effective hours
 		half_day_session = None
-		print("attendance",current_date, attendance.status if attendance else None)
 		if attendance and attendance.status == "Half Day":
 			if_leave_application = frappe.db.exists(
 				"Leave Application",

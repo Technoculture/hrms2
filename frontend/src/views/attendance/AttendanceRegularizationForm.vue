@@ -25,6 +25,11 @@
 		<ion-content class="ion-no-padding">
 			<div class="flex flex-col h-full w-screen sm:w-96 bg-gray-50">
 				<div class="flex-1 overflow-y-auto scrollbar-hide p-4 space-y-6">
+					<!-- Employee Name (only in case of read only mode) -->
+					<div class="bg-white rounded-lg p-3 shadow-sm">
+						<label class="block text-xs font-medium text-gray-700 mb-2">{{ __('Employee Name') }}</label>
+						<div class="text-sm text-gray-600">{{ employeeName || employee.data.employee_name }}</div>
+					</div>
 					
 					<!-- Date Selection -->
 					<div class="bg-white rounded-lg p-3 shadow-sm">
@@ -460,6 +465,7 @@ const isReadOnly = ref(false)
 const isApproved = ref(false)
 const isRejected = ref(false)
 const isPending = ref(false)
+const employeeName = ref('')
 
 // Function to load existing data
 function loadExistingData(data) {
@@ -488,6 +494,7 @@ function loadExistingData(data) {
 	isApproved.value = data.docstatus === 1
 	isRejected.value = data.docstatus === 2
 	isPending.value = data.docstatus === 0
+	employeeName.value = data.custom_employee_name + " (" + data.employee + ")"
 }
 
 // Functions for status display in read-only mode
