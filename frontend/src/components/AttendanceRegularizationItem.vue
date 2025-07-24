@@ -14,7 +14,7 @@
 							{{ __('Attendance Regularization') }}
 						</h3> -->
 						<span  class="text-xs text-gray-900">
-							• {{ getEmployeeName(props.doc) }}
+							• {{ getEmployeeName(props.doc) }} {{ props.doc.employee ? "(" + props.doc.employee + ")" : "" }}
 						</span>
 					</div>
 					<p class="text-xs text-gray-500">

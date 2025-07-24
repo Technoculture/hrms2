@@ -28,6 +28,11 @@ export const LEAVE_FIELDS = [
 		fieldtype: "Select",
 	},
 	{
+		fieldname: "employee",
+		label: "Employee Code",
+		fieldtype: "Data",
+	},
+	{
 		fieldname: "half_day_date",
 		label: "Half Day Date",
 		fieldtype: "Date",
