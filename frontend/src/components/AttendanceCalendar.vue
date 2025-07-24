@@ -41,13 +41,13 @@
 							class="absolute inset-0 rounded-full overflow-hidden"
 						>
 							<div class="h-full w-1/2 bg-yellow-200 absolute left-0"></div>
-							<div class="h-full w-1/2 bg-green-200 absolute right-0"></div>
+							<div class="h-full w-1/2 bg-green-300 absolute right-0"></div>
 						</div>
 						<div 
 							v-if="getEventOnDate(index) === 'FIRST HALF HOLIDAY'" 
 							class="absolute inset-0 rounded-full overflow-hidden"
 						>
-							<div class="h-full w-1/2 bg-green-200 absolute left-0"></div>
+							<div class="h-full w-1/2 bg-green-300 absolute left-0"></div>
 							<div class="h-full w-1/2 bg-gray-300 absolute right-0"></div>
 						</div>
 						<div 
@@ -55,13 +55,13 @@
 							class="absolute inset-0 rounded-full overflow-hidden"
 						>
 							<div class="h-full w-1/2 bg-gray-300 absolute left-0"></div>
-							<div class="h-full w-1/2 bg-green-200 absolute right-0"></div>
+							<div class="h-full w-1/2 bg-green-300 absolute right-0"></div>
 						</div>
 						<div 
 							v-if="getEventOnDate(index) === 'SECOND HALF'" 
 							class="absolute inset-0 rounded-full overflow-hidden"
 						>
-							<div class="h-full w-1/2 bg-green-200 absolute left-0"></div>
+							<div class="h-full w-1/2 bg-green-300 absolute left-0"></div>
 							<div class="h-full w-1/2 bg-yellow-200 absolute right-0"></div>
 						</div>
 						<div 
@@ -69,13 +69,13 @@
 							class="absolute inset-0 rounded-full overflow-hidden"
 						>
 							<div class="h-full w-1/2 bg-white-200 absolute left-0"></div>
-							<div class="h-full w-1/2 bg-blue-300 absolute right-0"></div>
+							<div class="h-full w-1/2 bg-yellow-200 absolute right-0"></div>
 						</div>
 						<div 
 							v-if="getEventOnDate(index) === 'FIRST HALF OPEN'" 
 							class="absolute inset-0 rounded-full overflow-hidden"
 						>
-							<div class="h-full w-1/2 bg-blue-300 absolute left-0"></div>
+							<div class="h-full w-1/2 bg-yellow-200 absolute left-0"></div>
 							<div class="h-full w-1/2 bg-white-200 absolute right-0"></div>
 						</div>
 						<span class="text-gray-800 text-sm font-medium m-auto z-10">
@@ -177,6 +177,11 @@ const summary = computed(() => {
 				summary["On Leave"] += 0.5
 			} else {
 				summary["On Leave"] = 0.5
+			}
+			if ("Half Day" in summary) {
+				summary["Half Day"] += 1
+			} else {
+				summary["Half Day"] = 1
 			}
 		}
 
