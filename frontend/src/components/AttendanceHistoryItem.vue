@@ -48,7 +48,7 @@
 				<div class="flex-1">
 					<p class="text-xs text-gray-500">{{ __('Check In') }}</p>
 					<div class="flex flex-col">
-						<p class="text-sm font-medium" :class="props.doc.late_entry ? 'text-red-600' : 'text-gray-900'">
+						<p class="text-sm font-medium" :class="props.doc.late_entry ? 'text-red-600' : 'text-green-600'">
 							{{ props.doc.clock_in_time || '--' }}
 						</p>
 						<p v-if="props.doc.swipe_missing_in" class="text-[10px] text-red-600 font-medium">
@@ -224,7 +224,7 @@ function getMissingOutClass(doc) {
 	if (!doc.clock_out_time || doc.clock_out_missing) {
 		return 'text-red-600'
 	}
-	return doc.early_exit ? 'text-red-600' : 'text-gray-900'
+	return doc.early_exit ? 'text-red-600' : 'text-green-600'
 }
 
 function getMissingOutText(doc) {
