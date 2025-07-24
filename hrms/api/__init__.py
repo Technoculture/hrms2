@@ -1228,9 +1228,9 @@ def convert_hours_to_string(hours: float | None) -> str:
 	"""
 	if hours is None:
 		return "0h 0m"
-	hours = int(hours)
-	minutes = int((hours - hours) * 60)
-	return f"{hours}h {minutes}m"
+	hours_fixed = int(hours)
+	minutes_fixed = int((hours - hours_fixed) * 60)
+	return f"{hours_fixed}h {minutes_fixed}m"
 
 @frappe.whitelist()
 def get_gross_hours(checkins: list) -> float:
