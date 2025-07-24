@@ -47,15 +47,15 @@
 							v-if="getEventOnDate(index) === 'FIRST HALF HOLIDAY'" 
 							class="absolute inset-0 rounded-full overflow-hidden"
 						>
-							<div class="h-full w-1/2 bg-green-300 absolute left-0"></div>
-							<div class="h-full w-1/2 bg-gray-300 absolute right-0"></div>
+							<div class="h-full w-1/2 bg-gray-300 absolute left-0"></div>
+							<div class="h-full w-1/2 bg-green-300 absolute right-0"></div>
 						</div>
 						<div 
 							v-if="getEventOnDate(index) === 'SECOND HALF HOLIDAY'" 
 							class="absolute inset-0 rounded-full overflow-hidden"
 						>
-							<div class="h-full w-1/2 bg-gray-300 absolute left-0"></div>
-							<div class="h-full w-1/2 bg-green-300 absolute right-0"></div>
+							<div class="h-full w-1/2 bg-green-300 absolute left-0"></div>
+							<div class="h-full w-1/2 bg-gray-300 absolute right-0"></div>
 						</div>
 						<div 
 							v-if="getEventOnDate(index) === 'SECOND HALF'" 

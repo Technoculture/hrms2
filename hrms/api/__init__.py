@@ -141,9 +141,13 @@ def get_attendance_calendar_events(employee: str, from_date: str, to_date: str) 
 	while date_diff(to_date, date) >= 0:
 		date_str = date.strftime("%Y-%m-%d")
 		if date_str in strf_holidays:
-			if events[date_str] == "FIRST HALF" or events[date_str] == "SECOND HALF":
+			if events[date_str] == "FIRST HALF":
 				events[date_str] = "FIRST HALF HOLIDAY"
-			elif events[date_str] == "FIRST HALF OPEN" or events[date_str] == "SECOND HALF OPEN":
+			elif events[date_str] == "SECOND HALF":
+				events[date_str] = "SECOND HALF HOLIDAY"
+			elif events[date_str] == "FIRST HALF OPEN":
+				events[date_str] = "FIRST HALF HOLIDAY"
+			elif events[date_str] == "SECOND HALF OPEN":
 				events[date_str] = "SECOND HALF HOLIDAY"
 		date = add_days(date, 1)
 
@@ -200,26 +204,37 @@ def get_attendance_for_calendar(employee: str, from_date: str, to_date: str) -> 
 				end_time = shift.end_time
 				in_time = get_time(d["in_time"])
 				out_time = get_time(d["out_time"])
-				# Convert all times to datetime.time for proper comparison
+
+				# Convert timedelta to time if necessary
 				if isinstance(start_time, datetime.timedelta):
 					start_time = (datetime.datetime.min + start_time).time()
 				if isinstance(end_time, datetime.timedelta):
 					end_time = (datetime.datetime.min + end_time).time()
-				# if out_time is more towards the start time, then it's first half
-				# Calculate mid_day_time by converting times to seconds, finding midpoint, then back to time
+				# Calculate mid_day_time (center of shift)
 				start_seconds = start_time.hour * 3600 + start_time.minute * 60 + start_time.second
 				end_seconds = end_time.hour * 3600 + end_time.minute * 60 + end_time.second
 				mid_seconds = (start_seconds + end_seconds) / 2
 				mid_day_time = datetime.time(int(mid_seconds // 3600), int((mid_seconds % 3600) // 60), int(mid_seconds % 60))
-				if out_time < mid_day_time:
+
+				def time_diff_in_seconds(t1, t2):
+					return abs((datetime.datetime.combine(datetime.date.today(), t2) - datetime.datetime.combine(datetime.date.today(), t1)).total_seconds())
+
+				# Calculate durations in first and second half
+				first_half_start = max(in_time, start_time)
+				first_half_end = min(out_time, mid_day_time)
+				first_half_duration = max(0, time_diff_in_seconds(first_half_start, first_half_end))
+
+				second_half_start = max(in_time, mid_day_time)
+				second_half_end = min(out_time, end_time)
+				second_half_duration = max(0, time_diff_in_seconds(second_half_start, second_half_end))
+				# Determine which half was less worked
+				if first_half_duration >= second_half_duration:
 					d["status"] = "SECOND HALF"
-				# if in_time is more towards the end time, then it's second half
-				elif in_time > mid_day_time:
-					d["status"] = "FIRST HALF"
 				else:
-					d["status"] = "SECOND HALF"
+					d["status"] = "FIRST HALF"
 			else:
 				d["status"] = "SECOND HALF"
+			print("d", d["attendance_date"], d["status"])
 	return {d["attendance_date"]: d["status"] for d in attendance}
 
 
