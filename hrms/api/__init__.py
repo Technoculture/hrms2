@@ -186,7 +186,6 @@ def get_attendance_for_calendar(employee: str, from_date: str, to_date: str) -> 
 	# if status is half day, then check if it's first half or second half
 	for d in attendance:
 			d = get_attendance_for_date(d)
-			print("d", d["attendance_date"], d["status"])
 	return {d["attendance_date"]: d["status"] for d in attendance}
 
 def get_attendance_for_date(d: any):
@@ -1103,10 +1102,6 @@ def get_attendance_history(employee: str, month: str) -> list[dict]:
 		if attendance:
 			# late_entry = attendance.late_entry or False
 			early_exit = attendance.early_exit or False
-			if date_str == "2025-07-24":
-						print("clock_in_datetime", clock_in_time, unformatted_clock_in_time)
-						# print("shift_start_datetime", shift_start_datetime)
-						# print("comparison", clock_in_datetime > shift_start_datetime)
 			
 			if clock_in_time and shift_start_time: # TODO: handle this crap in a better way
 				try:
@@ -1131,9 +1126,6 @@ def get_attendance_history(employee: str, month: str) -> list[dict]:
 						# If that fails, try alternative format
 						clock_in_datetime = datetime.strptime(f"{date_str} {unformatted_clock_in_time}", "%Y-%m-%d %I:%M:%S %p")
 					# if date_str == "2025-07-24":
-					# 	print("clock_in_datetime", clock_in_datetime)
-					# 	print("shift_start_datetime", shift_start_datetime)
-					# 	print("comparison", clock_in_datetime > shift_start_datetime)
 					if clock_in_datetime > shift_start_datetime:
 						late_minutes = int((clock_in_datetime - shift_start_datetime).total_seconds() / 60)
 					# if late_minutes is greater than 15, then set late_entry to True
