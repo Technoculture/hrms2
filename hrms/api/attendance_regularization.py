@@ -17,18 +17,20 @@ def save_attendance_regularization(date, regularisation_reasonn, in_out_records,
     if isinstance(in_out_records, str):
         in_out_records = json.loads(in_out_records)
 
-    doc = frappe.get_doc({
-        "doctype": "Attendance Regularization",
+    doc = frappe.new_doc("Attendance Regularization")
+    doc.update({
         "employee": employee,
         "date": getdate(date),
         "regularisation_reasonn": regularisation_reasonn,
-        "in_out_records": in_out_records,
-        "custom_existing_checkins": existing_checkins
+        "custom_existing_checkins": existing_checkins,
     })
-    print("existing_checkins", existing_checkins)
-    print("in_out_records", in_out_records)
 
-    print("=== Starting document insert ===")
+    for row in (in_out_records or []):
+        doc.append("in_out_records", {
+            "in_time":  "" if row.get("in_time") == None else row.get("in_time"),   # force blank
+            "out_time": "" if row.get("out_time") == None else row.get("out_time"), # force blank
+        })
+
     try:
         doc.insert(ignore_permissions=True)
     except Exception as e:
