@@ -181,61 +181,83 @@ def get_attendance_for_calendar(employee: str, from_date: str, to_date: str) -> 
 	attendance = frappe.get_all(
 		"Attendance",
 		{"employee": employee, "docstatus": 1, "attendance_date": ["between", [from_date, to_date]]},
-		["attendance_date", "status", "shift", "in_time", "out_time", "leave_application"],
+		["attendance_date", "status", "shift", "in_time", "out_time", "leave_application", "employee"],
 	)
 	# if status is half day, then check if it's first half or second half
 	for d in attendance:
-		if d["status"] == "Half Day":
-			# if there is any leave_application
-			leave_application = d.get("leave_application")
-			if leave_application:
-				# get the leave application
-				leave_session = frappe.db.get_value("Leave Application", leave_application, "custom_half_day_session")
-				if leave_session == "FIRST HALF":
-					d["status"] = "FIRST HALF"
-				elif leave_session == "SECOND HALF":
-					d["status"] = "SECOND HALF"
-				continue
-			# get the start time and end time of the shift
-			shift = d.get("shift")
-			if shift:
-				shift = frappe.get_doc("Shift Type", d["shift"])
-				start_time = shift.start_time
-				end_time = shift.end_time
-				in_time = get_time(d["in_time"])
-				out_time = get_time(d["out_time"])
-
-				# Convert timedelta to time if necessary
-				if isinstance(start_time, datetime.timedelta):
-					start_time = (datetime.datetime.min + start_time).time()
-				if isinstance(end_time, datetime.timedelta):
-					end_time = (datetime.datetime.min + end_time).time()
-				# Calculate mid_day_time (center of shift)
-				start_seconds = start_time.hour * 3600 + start_time.minute * 60 + start_time.second
-				end_seconds = end_time.hour * 3600 + end_time.minute * 60 + end_time.second
-				mid_seconds = (start_seconds + end_seconds) / 2
-				mid_day_time = datetime.time(int(mid_seconds // 3600), int((mid_seconds % 3600) // 60), int(mid_seconds % 60))
-
-				def time_diff_in_seconds(t1, t2):
-					return abs((datetime.datetime.combine(datetime.date.today(), t2) - datetime.datetime.combine(datetime.date.today(), t1)).total_seconds())
-
-				# Calculate durations in first and second half
-				first_half_start = max(in_time, start_time)
-				first_half_end = min(out_time, mid_day_time)
-				first_half_duration = max(0, time_diff_in_seconds(first_half_start, first_half_end))
-
-				second_half_start = max(in_time, mid_day_time)
-				second_half_end = min(out_time, end_time)
-				second_half_duration = max(0, time_diff_in_seconds(second_half_start, second_half_end))
-				# Determine which half was less worked
-				if first_half_duration >= second_half_duration:
-					d["status"] = "SECOND HALF"
-				else:
-					d["status"] = "FIRST HALF"
-			else:
-				d["status"] = "SECOND HALF"
+			d = get_attendance_for_date(d)
 			print("d", d["attendance_date"], d["status"])
 	return {d["attendance_date"]: d["status"] for d in attendance}
+
+def get_attendance_for_date(d: any):
+
+	# # check if the attendance is absent and still there is a leave application
+	status_for_other_half = None
+	if d["status"] == "Absent":
+		leave_application = frappe.db.exists("Leave Application", {"employee": d["employee"], "from_date": ["<=", d["attendance_date"]], "to_date": [">=", d["attendance_date"]], "status": ["in", ["Approved", "Open"]], "docstatus": ["in", [0, 1]]})
+		if leave_application:
+			is_half_day = frappe.db.get_value("Leave Application", leave_application, "half_day") and frappe.db.get_value("Leave Application", leave_application, "half_day_date") == d["attendance_date"]
+			if is_half_day:
+				d["status"] = "Half Day"
+				d["leave_application"] = leave_application
+				status_for_other_half = "ABSENT"
+			else:
+				d["status"] = "On Leave"
+	# check if the attendance is half day
+	if d["status"] == "Half Day":
+		# if there is any leave_application
+		leave_application = d.get("leave_application")
+		if leave_application:
+			# get the leave application
+			leave_session = frappe.db.get_value("Leave Application", leave_application, "custom_half_day_session")
+			if leave_session == "FIRST HALF":
+				d["status"] = "FIRST HALF"
+				if status_for_other_half:
+					d["status"] += " " + status_for_other_half
+			elif leave_session == "SECOND HALF":
+				d["status"] = "SECOND HALF"
+				if status_for_other_half:
+					d["status"] += " " + status_for_other_half
+			return d
+		# get the start time and end time of the shift
+		shift = d.get("shift")
+		if shift:
+			shift = frappe.get_doc("Shift Type", d["shift"])
+			start_time = shift.start_time
+			end_time = shift.end_time
+			in_time = get_time(d["in_time"])
+			out_time = get_time(d["out_time"])
+
+			# Convert timedelta to time if necessary
+			if isinstance(start_time, datetime.timedelta):
+				start_time = (datetime.datetime.min + start_time).time()
+			if isinstance(end_time, datetime.timedelta):
+				end_time = (datetime.datetime.min + end_time).time()
+			# Calculate mid_day_time (center of shift)
+			start_seconds = start_time.hour * 3600 + start_time.minute * 60 + start_time.second
+			end_seconds = end_time.hour * 3600 + end_time.minute * 60 + end_time.second
+			mid_seconds = (start_seconds + end_seconds) / 2
+			mid_day_time = datetime.time(int(mid_seconds // 3600), int((mid_seconds % 3600) // 60), int(mid_seconds % 60))
+
+			def time_diff_in_seconds(t1, t2):
+				return abs((datetime.datetime.combine(datetime.date.today(), t2) - datetime.datetime.combine(datetime.date.today(), t1)).total_seconds())
+
+			# Calculate durations in first and second half
+			first_half_start = max(in_time, start_time)
+			first_half_end = min(out_time, mid_day_time)
+			first_half_duration = max(0, time_diff_in_seconds(first_half_start, first_half_end))
+
+			second_half_start = max(in_time, mid_day_time)
+			second_half_end = min(out_time, end_time)
+			second_half_duration = max(0, time_diff_in_seconds(second_half_start, second_half_end))
+			# Determine which half was less worked
+			if first_half_duration >= second_half_duration:
+				d["status"] = "SECOND HALF"
+			else:
+				d["status"] = "FIRST HALF"
+		else:
+			d["status"] = "SECOND HALF"
+	return d
 
 
 def get_holidays_for_calendar(employee: str, from_date: str, to_date: str) -> list[str]:
@@ -1024,7 +1046,7 @@ def get_attendance_history(employee: str, month: str) -> list[dict]:
 				shift_type = shift_type_doc
 				shift_name = shift_type_doc.name
 				shift_start_time = format_time(shift_type_doc.start_time, format_string="hh:mm") if shift_type_doc.start_time else None
-				shift_end_time = format_time(shift_type_doc.end_time, format_string="hh:mm") if shift_type_doc.end_time else None
+				shift_end_time = format_time(shift_type_doc.end_time, format_string="HH:mm") if shift_type_doc.end_time else None
 		# Get employee checkins for this date
 		checkins = frappe.get_all(
 			"Employee Checkin",
@@ -1039,6 +1061,8 @@ def get_attendance_history(employee: str, month: str) -> list[dict]:
 		# Process time logs and calculate clock in/out times
 		time_logs = []
 		clock_in_time = None
+		unformatted_clock_in_time = None
+		unformatted_clock_out_time = None
 		clock_out_time = None
 		clock_out_missing = False
 		swipe_missing_in = False
@@ -1047,14 +1071,16 @@ def get_attendance_history(employee: str, month: str) -> list[dict]:
 		for checkin in checkins:
 			time_logs.append({
 				"log_type": checkin.log_type,
-				"time": format_datetime(checkin.time, format_string="hh:mm:ss"),
+				"time": format_datetime(checkin.time, format_string="hh:mm a"),
 				"missing": False
 			})
 			
 			if checkin.log_type == "IN" and not clock_in_time:
 				clock_in_time = format_datetime(checkin.time, format_string="hh:mm:ss")
+				unformatted_clock_in_time = format_datetime(checkin.time, format_string="HH:mm:ss")
 			elif checkin.log_type == "OUT":
 				clock_out_time = format_datetime(checkin.time, format_string="hh:mm:ss")
+				unformatted_clock_out_time = format_datetime(checkin.time, format_string="HH:mm:ss")
 		
 		# Check for missing swipes
 		if attendance and attendance.status == "Present":
@@ -1077,6 +1103,10 @@ def get_attendance_history(employee: str, month: str) -> list[dict]:
 		if attendance:
 			# late_entry = attendance.late_entry or False
 			early_exit = attendance.early_exit or False
+			if date_str == "2025-07-24":
+						print("clock_in_datetime", clock_in_time, unformatted_clock_in_time)
+						# print("shift_start_datetime", shift_start_datetime)
+						# print("comparison", clock_in_datetime > shift_start_datetime)
 			
 			if clock_in_time and shift_start_time: # TODO: handle this crap in a better way
 				try:
@@ -1096,11 +1126,14 @@ def get_attendance_history(employee: str, month: str) -> list[dict]:
 					# Convert clock_in_time to datetime object
 					try:
 						# Try parsing with the format used in format_datetime above
-						clock_in_datetime = datetime.strptime(f"{date_str} {clock_in_time}", "%Y-%m-%d %H:%M:%S")
+						clock_in_datetime = datetime.strptime(f"{date_str} {unformatted_clock_in_time}", "%Y-%m-%d %H:%M:%S")
 					except ValueError:
 						# If that fails, try alternative format
-						clock_in_datetime = datetime.strptime(f"{date_str} {clock_in_time}", "%Y-%m-%d %I:%M:%S %p")
-					
+						clock_in_datetime = datetime.strptime(f"{date_str} {unformatted_clock_in_time}", "%Y-%m-%d %I:%M:%S %p")
+					# if date_str == "2025-07-24":
+					# 	print("clock_in_datetime", clock_in_datetime)
+					# 	print("shift_start_datetime", shift_start_datetime)
+					# 	print("comparison", clock_in_datetime > shift_start_datetime)
 					if clock_in_datetime > shift_start_datetime:
 						late_minutes = int((clock_in_datetime - shift_start_datetime).total_seconds() / 60)
 					# if late_minutes is greater than 15, then set late_entry to True
@@ -1179,7 +1212,7 @@ def get_attendance_history(employee: str, month: str) -> list[dict]:
 					"employee": employee,
 					"from_date": ["<=", current_date],
 					"to_date": [">=", current_date],
-					"status": "Approved",
+					"status": ["in", ["Approved", "Open"]],
 					"half_day": 1,
 					"half_day_date": current_date,
 					"docstatus": 1
@@ -1192,16 +1225,44 @@ def get_attendance_history(employee: str, month: str) -> list[dict]:
 					half_day_session = leave_application.custom_half_day_session
 					gross_hours = convert_hours_to_string(get_gross_hours(checkins))
 					effective_hours = convert_hours_to_string(get_effective_hours(checkins))
+		# for higher priority of leaves (attendance may or may not be present), then get the leave application and check if the leave is approved
+		if_leave_application = frappe.db.exists(
+			"Leave Application",
+			{
+				"employee": employee,
+				"from_date": ["<=", current_date],
+				"to_date": [">=", current_date],
+				"status": ["in", ["Approved", "Open"]],
+				# "half_day": 1,
+				# "half_day_date": current_date,
+				"docstatus": ["in", [0, 1]]
+			}
+		)
+		if if_leave_application:
+			leave_application = frappe.get_doc("Leave Application", if_leave_application)
+			if leave_application.status in ["Approved", "Open"]:
+				if leave_application.half_day and leave_application.half_day_date == current_date:
+					status = "Half Day"
+					half_day_session = leave_application.custom_half_day_session
+					gross_hours = convert_hours_to_string(get_gross_hours(checkins))
+					effective_hours = convert_hours_to_string(get_effective_hours(checkins))
+				else:
+					status = "On Leave"
+					# leave_type = leave_application.leave_type
+					# leave_days = leave_application.total_leave_days
+					# leave_days_without_holidays = leave_application.total_leave_days_without_holidays
+					# leave_days_with_holidays = leave_application.total_leave_days_with_holidays
+
 		# Build the attendance record
 		attendance_record = {
 			"date": date_str,
 			"status": status,
 			"half_day_session": half_day_session,
 			"shift_name": shift_name,
-			"shift_start_time": shift_start_time,
-			"shift_end_time": shift_end_time,
-			"clock_in_time": clock_in_time,
-			"clock_out_time": clock_out_time,
+			"shift_start_time": format_time(shift_start_time,format_string="hh:mm a"),
+			"shift_end_time": format_time(shift_end_time,format_string="hh:mm a"),
+			"clock_in_time": format_time(unformatted_clock_in_time,format_string="hh:mm a") if unformatted_clock_in_time else unformatted_clock_in_time or clock_in_time,
+			"clock_out_time": format_time(unformatted_clock_out_time,format_string="hh:mm a") if unformatted_clock_out_time else unformatted_clock_out_time or clock_out_time,
 			"clock_out_missing": clock_out_missing,
 			"late_entry": late_entry,
 			"late_minutes": late_minutes,

@@ -59,8 +59,9 @@ function formatDate(date) {
 function formatRelativeTime(datetime) {
 	const now = dayjs()
 	const target = dayjs(datetime)
-	const diffDays = now.diff(target, 'day')
-	
+
+	const diffDays = now.startOf('day').diff(target.startOf('day'), 'day')
+
 	if (diffDays === 0) {
 		return __('Today')
 	} else if (diffDays === 1) {

@@ -58,6 +58,13 @@
 							<div class="h-full w-1/2 bg-gray-300 absolute right-0"></div>
 						</div>
 						<div 
+							v-if="getEventOnDate(index) === 'SECOND HALF ABSENT'" 
+							class="absolute inset-0 rounded-full overflow-hidden"
+						>
+							<div class="h-full w-1/2 bg-red-200 absolute left-0"></div>
+							<div class="h-full w-1/2 bg-yellow-200 absolute right-0"></div>
+						</div>
+						<div 
 							v-if="getEventOnDate(index) === 'SECOND HALF'" 
 							class="absolute inset-0 rounded-full overflow-hidden"
 						>
@@ -182,6 +189,23 @@ const summary = computed(() => {
 				summary["Half Day"] += 1
 			} else {
 				summary["Half Day"] = 1
+			}
+		}
+		if (updatedStatus === "FIRST HALF ABSENT" || updatedStatus === "SECOND HALF ABSENT") {
+			if ("On Leave" in summary) {
+				summary["On Leave"] += 0.5
+			} else {
+				summary["On Leave"] = 0.5
+			}
+			if ("Half Day" in summary) {
+				summary["Half Day"] += 1
+			} else {
+				summary["Half Day"] = 1
+			}
+			if ("Absent" in summary) {
+				summary["Absent"] += 0.5
+			} else {
+				summary["Absent"] = 0.5
 			}
 		}
 
