@@ -1239,7 +1239,7 @@ def get_attendance_history(employee: str, month: str) -> list[dict]:
 					gross_hours = convert_hours_to_string(get_gross_hours(checkins))
 					effective_hours = convert_hours_to_string(get_effective_hours(checkins))
 				else:
-					status = "On Leave"
+					status = "Leave"
 					# leave_type = leave_application.leave_type
 					# leave_days = leave_application.total_leave_days
 					# leave_days_without_holidays = leave_application.total_leave_days_without_holidays
