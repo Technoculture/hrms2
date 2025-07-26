@@ -65,6 +65,13 @@
 							<div class="h-full w-1/2 bg-yellow-200 absolute right-0"></div>
 						</div>
 						<div 
+							v-if="getEventOnDate(index) === 'FIRST HALF ABSENT'" 
+							class="absolute inset-0 rounded-full overflow-hidden"
+						>
+							<div class="h-full w-1/2 bg-yellow-200 absolute left-0"></div>
+							<div class="h-full w-1/2 bg-red-200 absolute right-0"></div>
+						</div>
+						<div 
 							v-if="getEventOnDate(index) === 'SECOND HALF'" 
 							class="absolute inset-0 rounded-full overflow-hidden"
 						>
