@@ -231,7 +231,7 @@ const inOutRecords = ref([
 ])
 
 // Computed values
-const maxDate = computed(() => dayjs().subtract(1, 'day').format('YYYY-MM-DD')) // Yesterday
+const maxDate = computed(() => dayjs().format('YYYY-MM-DD')) // today
 const minDate = computed(() => {
 	// Calculate the start of last week (Monday of last week)
 	const today = dayjs()
