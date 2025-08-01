@@ -51,7 +51,7 @@
 							/>
 						</div>
 						<p class="text-xs text-gray-500 mt-1">
-							{{ __('Only dates from last week and current week until yesterday are allowed') }}
+							{{ __('Only dates from last week and current week until today are allowed') }}
 						</p>
 					</div>
 
