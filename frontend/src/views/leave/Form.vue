@@ -241,7 +241,12 @@ function setHalfDayDate(half_day) {
 	half_day_session.hidden = !half_day
 	half_day_session.reqd = half_day
 
-	if (!half_day) return
+	if (!half_day) {
+		// Reset half day date and session when half day is unchecked
+		leaveApplication.value.half_day_date = null
+		leaveApplication.value.custom_half_day_session = null
+		return
+	}
 
 	if (leaveApplication.value.from_date === leaveApplication.value.to_date) {
 		leaveApplication.value.half_day_date = leaveApplication.value.from_date
