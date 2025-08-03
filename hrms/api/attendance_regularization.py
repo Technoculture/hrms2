@@ -16,13 +16,18 @@ def save_attendance_regularization(date, regularisation_reasonn, in_out_records,
     # Parse list if passed as JSON string
     if isinstance(in_out_records, str):
         in_out_records = json.loads(in_out_records)
+    # convert existing checkins to correct format
+    existing_checkins2 = [{
+        "log_time": checkin.get("time"),
+        "log_type": checkin.get("log_type"),
+        } for checkin in existing_checkins]
 
     doc = frappe.new_doc("Attendance Regularization")
     doc.update({
         "employee": employee,
         "date": getdate(date),
         "regularisation_reasonn": regularisation_reasonn,
-        "custom_existing_checkins": existing_checkins,
+        "custom_existing_checkins": existing_checkins2,
     })
 
     for row in (in_out_records or []):
