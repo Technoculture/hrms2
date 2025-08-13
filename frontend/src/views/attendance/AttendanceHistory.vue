@@ -21,8 +21,8 @@
 					
 					<!-- Month Navigation -->
 					<div class="flex justify-between items-center px-4 pb-4">
-						<button @click="previousMonth" class="p-2">
-							<FeatherIcon name="chevron-left" class="h-5 w-5 text-gray-600" />
+						<button @click="previousMonth" class="p-2" :disabled="!canGoToPreviousMonth">
+							<FeatherIcon name="chevron-left" class="h-5 w-5" :class="canGoToPreviousMonth ? 'text-gray-600' : 'text-gray-300'" />
 						</button>
 						<h2 class="text-base font-medium text-purple-600">{{ currentMonthLabel }}</h2>
 						<button @click="nextMonth" class="p-2" :disabled="isCurrentMonth">
@@ -107,6 +107,11 @@ const isCurrentMonth = computed(() => {
 	return currentMonth.value.isSame(dayjs(), 'month')
 })
 
+const canGoToPreviousMonth = computed(() => {
+	const twoMonthsAgo = dayjs().subtract(2, 'month')
+	return currentMonth.value.isAfter(twoMonthsAgo, 'month')
+})
+
 // Attendance history resource
 const attendanceHistory = createResource({
 	url: "hrms.api.get_attendance_history",
@@ -126,7 +131,13 @@ watch(currentMonth, () => {
 
 // Navigation functions
 function previousMonth() {
-	currentMonth.value = currentMonth.value.subtract(1, 'month')
+	const twoMonthsAgo = dayjs().subtract(2, 'month')
+	const newMonth = currentMonth.value.subtract(1, 'month')
+	
+	// Only allow navigation if the new month is not older than 2 months ago
+	if (newMonth.isAfter(twoMonthsAgo, 'month') || newMonth.isSame(twoMonthsAgo, 'month')) {
+		currentMonth.value = newMonth
+	}
 }
 
 function nextMonth() {

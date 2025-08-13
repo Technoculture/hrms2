@@ -565,6 +565,133 @@ def get_holidays_for_employee(employee: str) -> list[dict]:
 
 	return holidays
 
+@frappe.whitelist()
+def get_today_holidays_for_employee(employee: str) -> dict:
+	"""
+	Get holiday data for today - returns different structure for employees vs managers
+	Args:
+		employee (str): Employee ID
+	Returns:
+		dict: Holiday data with has_holidays_today, is_manager flags and holiday_lists
+	"""
+	current_user = frappe.db.get_value("Employee", employee, "user_id")
+	today = getdate()
+	
+	# Check if current employee is a manager by finding employees who have them as leave approver
+	managed_employees = frappe.db.sql("""
+		SELECT DISTINCT e.name, e.employee_name, e.holiday_list
+		FROM `tabEmployee` e
+		INNER JOIN `tabDepartment Approver` ela ON ela.parent = e.name
+		WHERE ela.approver = %s AND e.status = 'Active'
+	""", (current_user,), as_dict=True)	
+	
+	is_manager = len(managed_employees) > 0
+	holiday_lists_data = []
+	
+	if is_manager:
+		# For managers - get distinct holiday lists from managed employees
+		holiday_lists = {}
+		
+		for emp in managed_employees:
+			emp_holiday_list = emp.holiday_list or get_holiday_list_for_employee(emp.name, raise_exception=False)
+			if emp_holiday_list:
+				if emp_holiday_list not in holiday_lists:
+					holiday_lists[emp_holiday_list] = {
+						'employees': [],
+						'holiday_list_name': emp_holiday_list
+					}
+				holiday_lists[emp_holiday_list]['employees'].append(emp)
+		
+		# Get today's holidays for each holiday list
+		for holiday_list_name, data in holiday_lists.items():
+			today_holidays = frappe.db.get_all(
+				"Holiday",
+				filters={
+					"parent": holiday_list_name,
+					"holiday_date": today,
+					"weekly_off": 0
+				},
+				fields=["name", "holiday_date", "description"]
+			)
+			
+			if today_holidays:
+				employees_in_list = data['employees']
+				holiday_lists_data.append({
+					"holiday_list_name": holiday_list_name,
+					"holidays": [{
+						"name": today_holidays[0].name,
+						"holiday_date": today_holidays[0].holiday_date,
+						"description": strip_html(today_holidays[0].description or "").strip(),
+						"holiday_list": holiday_list_name
+					}],
+					"employees_count": len(employees_in_list),
+					"sample_employees": [emp.employee_name for emp in employees_in_list[:3]]
+				})
+		# merge the data if the holiday date is same and make the holiday list name as Multiples
+		holiday_lists_data = merge_holiday_lists_data(holiday_lists_data)[0]["holiday_lists"] if len(holiday_lists_data) > 0 else []
+	else:
+		# For regular employees - get their own holiday list
+		employee_holiday_list = get_holiday_list_for_employee(employee, raise_exception=False)
+		if employee_holiday_list:
+			today_holidays = frappe.db.get_all(
+				"Holiday",
+				filters={
+					"parent": employee_holiday_list,
+					"holiday_date": today,
+					"weekly_off": 0
+				},
+				fields=["name", "holiday_date", "description"]
+			)
+			
+			if today_holidays:
+				holiday_lists_data.append({
+					"holiday_list_name": employee_holiday_list,
+					"holidays": [{
+						"name": today_holidays[0].name,
+						"holiday_date": today_holidays[0].holiday_date,
+						"description": strip_html(today_holidays[0].description or "").strip(),
+						# "holiday_list": holiday_list_name
+					}]
+				})
+	
+	return {
+		"has_holidays_today": len(holiday_lists_data) > 0,
+		"is_manager": is_manager,
+		"holiday_lists": holiday_lists_data
+	}
+
+def merge_holiday_lists_data(holiday_lists_data: list[dict]) -> list[dict]:
+	merged_data = []
+	holiday_list_map = {}
+	for holiday_list in holiday_lists_data:
+		if holiday_list["holidays"][0]["holiday_date"] in holiday_list_map:
+			holiday_list_map[holiday_list["holidays"][0]["holiday_date"]] = [{					
+				"holiday_list_name": "Multiple Holiday Lists",
+				"holidays": [{
+					"name": holiday_list["holidays"][0]["name"],
+					"holiday_date": holiday_list["holidays"][0]["holiday_date"],
+					"description": holiday_list["holidays"][0]["description"],
+					"holiday_list": holiday_list["holiday_list_name"],
+				}],
+				"employees_count": holiday_list_map[holiday_list["holidays"][0]["holiday_date"]][0]["employees_count"] + holiday_list["employees_count"],
+				"sample_employees": holiday_list_map[holiday_list["holidays"][0]["holiday_date"]][0]["sample_employees"] + holiday_list["sample_employees"]
+			}]
+		else:
+			holiday_list_map[holiday_list["holidays"][0]["holiday_date"]] = [{					
+				"holiday_list_name": holiday_list["holiday_list_name"],
+				"holidays": [{
+					"name": holiday_list["holidays"][0]["name"],
+					"holiday_date": holiday_list["holidays"][0]["holiday_date"],
+					"description": holiday_list["holidays"][0]["description"],
+					"holiday_list": holiday_list["holiday_list_name"],
+				}],
+				"employees_count": holiday_list["employees_count"],
+				"sample_employees": holiday_list["sample_employees"]
+			}]
+	
+	for holiday_date, holiday_lists in holiday_list_map.items():
+		merged_data.append({"holiday_date": holiday_date, "holiday_lists": holiday_lists})
+	return merged_data
 
 @frappe.whitelist()
 def get_leave_approval_details(employee: str) -> dict:
@@ -1390,6 +1517,8 @@ def get_employee_checkin_records(employee: str, date: str) -> list[dict]:
 	]
 
 	return checkins
+
+
 
 
 @frappe.whitelist()

@@ -77,6 +77,11 @@ const routes = [
 		name: "InvalidEmployee",
 		component: () => import("@/views/InvalidEmployee.vue"),
 	},
+	{
+		path: "/today-holidays",
+		name: "TodayHolidaysList",
+		component: () => import("@/views/holidays/TodayHolidaysList.vue"),
+	},
 	...attendanceRoutes,
 	...leaveRoutes,
 	...claimRoutes,
