@@ -1,13 +1,18 @@
 <template>
   <div class="flex flex-col gap-5 my-4 w-full" v-if="employeesOnLeave.data && employeesOnLeave.data.length">
     <div class="flex flex-row justify-between items-center">
-      <div class="text-lg font-medium text-gray-900">{{ __("Employees On Leave") }}</div>
+      <div class="text-lg font-medium text-gray-900">{{ __("Team Leaves  👥") }}</div>
+      <div class="flex items-center gap-3">
+        <div v-if="employeesOnLeave.data.length > 0" class="text-sm text-gray-600">
+          {{ new Set(employeesOnLeave.data.map(e => e.employee)).size }} {{ __("employees") }}
+        </div>
       <router-link 
         :to="{ name: 'EmployeesOnLeaveList' }" 
         class="text-sm font-medium text-blue-600"
       >
         {{ __("View All") }}
       </router-link>
+      </div>
     </div>
     
     <div class="flex flex-row flex-wrap gap-4 bg-white rounded p-4">
@@ -16,12 +21,12 @@
         :key="employee.name"
         class="flex flex-col items-center gap-2"
       >
-        <div class="h-12 w-12 rounded-full bg-gray-200 flex items-center justify-center text-gray-700 font-medium">
+        <div class="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-700">
           {{ getInitials(employee.name) }}
         </div>
-        <div class="text-xs text-center font-medium text-gray-800 max-w-16 truncate">
+        <!-- <div class="text-xs text-center font-medium text-gray-800 max-w-16 truncate">
           {{ employee.name }}
-        </div>
+        </div> -->
       </div>
     </div>
   </div>

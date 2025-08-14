@@ -5,7 +5,7 @@
 				<CheckInPanel />
 				<EmployeesOnLeave />
 				<TodayHoliday />
-				<QuickLinks :items="quickLinks" :title="__('Employee Dashboard')" />
+				<QuickLinks :items="quickLinks" :title="__('My Dashboard 📊')" />
 				<RequestPanel />
 			</div>
 		</template>
