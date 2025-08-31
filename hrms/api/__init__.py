@@ -478,6 +478,67 @@ def get_leave_applications(
 
 	return applications
 
+@frappe.whitelist()
+def get_leave_applications_for_approval(
+	employee: str,
+	approver_id: str | None = None,
+	for_approval: bool = False,
+	limit: int | None = None,
+) -> list[dict]:
+	"""
+	Get leave applications of the employees for which given employees is one of the approvers (based on custom_leave_approvers field in employee doctype)
+	Args:
+		employee: str
+		approver_id: str
+		for_approval: bool
+		limit: int | None
+	Returns:
+		list[dict]: List of leave applications
+	"""	
+	managed_employees = frappe.db.sql("""
+		SELECT DISTINCT e.name, e.employee_name, e.holiday_list
+		FROM `tabEmployee` e
+		INNER JOIN `tabDepartment Approver` ela ON ela.parent = e.name
+		WHERE ela.approver = %s AND e.status = 'Active'
+	""", (approver_id,), as_dict=True)
+	filters = get_filters("Leave Application", employee, None, for_approval)
+	fields = [
+		"name",
+		"posting_date",
+		"employee",
+		"employee_name",
+		"leave_type",
+		"status",
+		"from_date",
+		"to_date",
+		"half_day",
+		"half_day_date",
+		"description",
+		"total_leave_days",
+		"leave_balance",
+		"leave_approver",
+		"posting_date",
+		"creation",
+	]
+	filters["employee"] = ("in", [employee.name for employee in managed_employees])
+
+	if workflow_state_field := get_workflow_state_field("Leave Application"):
+		fields.append(workflow_state_field)
+
+	applications = frappe.get_list(
+		"Leave Application",
+		fields=fields,
+		filters=filters,
+		order_by="posting_date desc",
+		limit=limit,
+	)
+
+	if workflow_state_field:
+		for application in applications:
+			application["workflow_state_field"] = workflow_state_field
+
+	return applications
+
 
 @frappe.whitelist()
 def get_leave_balance_map(employee: str) -> dict[str, dict[str, float]]:

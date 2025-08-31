@@ -35,9 +35,8 @@ export const myLeaves = createResource({
 		leaveBalance.reload()
 	},
 })
-
 export const teamLeaves = createResource({
-	url: "hrms.api.get_leave_applications",
+	url: "hrms.api.get_leave_applications_for_approval",
 	params: {
 		employee: employeeResource.data.name,
 		approver_id: employeeResource.data.user_id,
@@ -47,9 +46,25 @@ export const teamLeaves = createResource({
 	auto: true,
 	cache: "hrms:team_leaves",
 	transform(data) {
+		console.log("data", data)
 		return transformLeaveData(data)
 	},
 })
+
+// export const teamLeaves = createResource({
+// 	url: "hrms.api.get_leave_applications",
+// 	params: {
+// 		employee: employeeResource.data.name,
+// 		approver_id: employeeResource.data.user_id,
+// 		for_approval: 1,
+// 		limit: 5,
+// 	},
+// 	auto: true,
+// 	cache: "hrms:team_leaves",
+// 	transform(data) {
+// 		return transformLeaveData(data)
+// 	},
+// })
 
 export const leaveBalance = createResource({
 	url: "hrms.api.get_leave_balance_map",
