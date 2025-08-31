@@ -88,13 +88,38 @@ export const myLWBalance = createResource({
 	},
 })
 
-export const getMergedLeaveBalance = (leaveBalanceData, myLWBalanceData) => {
+export const halfDayQuota = createResource({
+	url: "hrms.api.get_half_day_quota",
+	params: {
+		employee: employeeResource.data.name,
+		date: dayjs().format("YYYY-MM-DD"),
+	},
+	auto: true,
+	cache: "hrms:half_day_quota",
+	transform: (data) => {
+		if (!data) {
+			return null
+		}
+		return Object.fromEntries(
+			Object.entries(data).map(([half_day_type, allocation]) => {
+				allocation.balance_percentage =
+					(allocation.balance_leaves / allocation.allocated_leaves) * 100
+				return [half_day_type, allocation]
+			})
+		)
+	},
+})
+
+export const getMergedLeaveBalance = (leaveBalanceData, myLWBalanceData, halfDayQuotaData) => {
 	let data = {}
 	if (leaveBalanceData) {
 		data = { ...data, ...leaveBalanceData }
 	}
 	if (myLWBalanceData) {
 		data = { ...data, ...myLWBalanceData }
+	}
+	if (halfDayQuotaData) {
+		data = { ...data, ...halfDayQuotaData }
 	}
 	return data
 }

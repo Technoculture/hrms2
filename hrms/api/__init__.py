@@ -6,6 +6,7 @@ from frappe.query_builder import Order
 from frappe.utils import add_days, date_diff, getdate, strip_html, get_time, time_diff_in_hours
 import datetime
 from erpnext.setup.doctype.employee.employee import get_holiday_list_for_employee
+from tcr_erp.utils.half_day_quota_utils import get_employee_quota
 
 SUPPORTED_FIELD_TYPES = [
 	"Link",
@@ -545,6 +546,19 @@ def get_my_lwp_consumption(employee: str) -> dict:
 		}
 	return leave_map
 
+@frappe.whitelist()	
+def get_half_day_quota(employee: str, date: str) -> dict:	
+	data = get_employee_quota(employee, date)
+	if not data:
+		return None
+	return {
+		"Half Day Quota": {
+			"allocated_leaves": data.allocated_half_days,
+			"balance_leaves": data.balance_half_days,
+			"used_leaves": data.used_half_days,
+		}
+	}
+
 
 @frappe.whitelist()
 def get_holidays_for_employee(employee: str) -> list[dict]:
@@ -625,7 +639,7 @@ def get_today_holidays_for_employee(employee: str) -> dict:
 						"holiday_list": holiday_list_name
 					}],
 					"employees_count": len(employees_in_list),
-					"sample_employees": [emp.employee_name for emp in employees_in_list[:3]]
+					"sample_employees": [emp.employee_name for emp in employees_in_list]
 				})
 		# merge the data if the holiday date is same and make the holiday list name as Multiples
 		holiday_lists_data = merge_holiday_lists_data(holiday_lists_data)[0]["holiday_lists"] if len(holiday_lists_data) > 0 else []

@@ -5,7 +5,7 @@
 			<router-link
 				:to="{ name: 'LeaveApplicationListView' }"
 				v-slot="{ navigate }"
-				v-if="getMergedLeaveBalance(leaveBalance.data, myLWBalance.data)"
+				v-if="getMergedLeaveBalance(leaveBalance.data, myLWBalance.data, halfDayQuota.data)"
 			>
 				<div
 					@click="navigate"
@@ -19,10 +19,10 @@
 		<!-- Leave Balance Dashboard -->
 		<div
 			class="flex flex-row gap-4 overflow-x-auto py-2 mt-3"
-			v-if="getMergedLeaveBalance(leaveBalance.data, myLWBalance.data)"
+			v-if="getMergedLeaveBalance(leaveBalance.data, myLWBalance.data, halfDayQuota.data)"
 		>
 			<div
-				v-for="(allocation, leave_type, index) in getMergedLeaveBalance(leaveBalance.data, myLWBalance.data)"
+				v-for="(allocation, leave_type, index) in getMergedLeaveBalance(leaveBalance.data, myLWBalance.data, halfDayQuota.data)"
 				:key="leave_type"
 				class="flex flex-col bg-white border-none rounded-lg drop-shadow-md gap-2 p-4 items-start first:ml-4"
 			>
@@ -45,7 +45,7 @@
 
 <script setup>
 import SemicircleChart from "@/components/SemicircleChart.vue"
-import { leaveBalance, myLWBalance, getMergedLeaveBalance } from "@/data/leaves"
+import { leaveBalance, myLWBalance, getMergedLeaveBalance, halfDayQuota } from "@/data/leaves"
 import { inject } from "vue"
 
 const __ = inject("$translate")
