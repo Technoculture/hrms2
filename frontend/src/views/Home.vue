@@ -3,9 +3,9 @@
 		<template #body>
 			<div class="flex flex-col items-center my-7 p-4 gap-7">
 				<CheckInPanel />
+				<QuickLinks :items="quickLinks" :title="__('My Dashboard 📊')" />
 				<EmployeesOnLeave />
 				<TodayHoliday />
-				<QuickLinks :items="quickLinks" :title="__('My Dashboard 📊')" />
 				<RequestPanel />
 			</div>
 		</template>
