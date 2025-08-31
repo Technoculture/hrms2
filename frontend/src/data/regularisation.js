@@ -13,3 +13,16 @@ export const myRegularisationRequests = createResource({
 	auto: true,
 	cache: "hrms:my_regularisation_requests"
 })
+
+export const teamRegularisationRequests = createResource({
+	url: "hrms.api.get_attendance_regularization_requests",
+	makeParams() {
+		return {
+			employee: employeeResource.data?.name,
+			limit: 5,
+			filters: { approver: employeeResource.data?.user_id }
+		}
+	},
+	auto: true,
+	cache: "hrms:team_regularisation_requests"
+})
