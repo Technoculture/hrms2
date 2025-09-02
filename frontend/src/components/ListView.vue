@@ -59,7 +59,7 @@
 
 				<div
 					class="flex flex-col bg-white rounded mt-5"
-					v-if="!documents.loading && documents.data?.length"
+					v-if="!documents.loading && documents.data?.length && !managed_employees.loading"
 				>
 					<div
 						class="p-3.5 items-center justify-between border-b cursor-pointer"
@@ -95,7 +95,7 @@
 				/>
 
 				<!-- Loading Indicator -->
-				<div v-if="documents.loading" class="flex mt-2 items-center justify-center">
+				<div v-if="documents.loading || managed_employees.loading" class="flex mt-2 items-center justify-center">
 					<LoadingIndicator class="w-8 h-8 text-gray-800" />
 				</div>
 			</div>
@@ -158,6 +158,7 @@ import { EMPLOYEE_CHECKIN_FIELDS } from "@/data/config/requestSummaryFields"
 
 import useWorkflow from "@/composables/workflow"
 import { useListUpdate } from "@/composables/realtime"
+import { managed_employees } from "@/data/leaves"
 
 const __ = inject("$translate")
 const props = defineProps({
@@ -263,13 +264,16 @@ const documents = createResource({
 		// convert keys and values arrays to docs object
 		const fields = data["keys"]
 		const values = data["values"]
-		const docs = values.map((value) => {
+		let docs = values.map((value) => {
 			const doc = {}
 			fields.forEach((field, index) => {
 				doc[field] = value[index]
 			})
 			return doc
 		})
+		// filter out the non managed_employees from docs
+		docs = docs.filter(item => managed_employees.data.includes(item.employee))
+		 
 
 		let pagedData
 		if (!documents.params.start || documents.params.start === 0) {

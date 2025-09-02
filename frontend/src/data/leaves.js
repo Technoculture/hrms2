@@ -46,8 +46,20 @@ export const teamLeaves = createResource({
 	auto: true,
 	cache: "hrms:team_leaves",
 	transform(data) {
-		console.log("data", data)
 		return transformLeaveData(data)
+	},
+})
+
+export const managed_employees = createResource({
+	url: "hrms.api.get_managed_employees",
+	params: {
+		employee: employeeResource.data.name,
+		approver_id: employeeResource.data.user_id,		
+	},
+	auto: true,
+	cache: "hrms:managed_employees",
+	transform(data) {
+		return data
 	},
 })
 

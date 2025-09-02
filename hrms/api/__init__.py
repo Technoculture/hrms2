@@ -479,6 +479,24 @@ def get_leave_applications(
 	return applications
 
 @frappe.whitelist()
+def get_managed_employees(
+	employee: str,
+	approver_id: str | None = None,
+) -> list[str]:
+	"""
+	Return the employee names (primary keys)
+	"""
+	managed_employees = frappe.db.sql("""
+		SELECT DISTINCT e.name, e.employee_name, e.holiday_list
+		FROM `tabEmployee` e
+		INNER JOIN `tabDepartment Approver` ela ON ela.parent = e.name
+		WHERE ela.approver = %s AND e.status = 'Active'
+	""", (approver_id,), as_dict=True)
+	return [employee.name for employee in managed_employees]
+
+
+
+@frappe.whitelist()
 def get_leave_applications_for_approval(
 	employee: str,
 	approver_id: str | None = None,
