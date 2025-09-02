@@ -1611,20 +1611,26 @@ def get_attendance_regularization_requests(employee: str, filters: dict) -> list
 		usable_filters["employee"] = filters["employee"]
 	# when approver is provided, then get the employees under the approver
 	if filters.get("approver"):
-		employees = frappe.get_all(
-			"Employee",
-			filters={
-				"user_id": ["!=", filters["approver"]]
-			},
-			or_filters=[
-				{"reports_to": filters["approver"]},
-				{"custom_reporting_manager_l1": filters["approver"]},
-				{"custom_reporting_manager_l2": filters["approver"]},
-				{"leave_approver": filters["approver"]}
-			],
-			fields=["name"]
-		)
-		employee_list = [e["name"] for e in employees]
+		managed_employees = frappe.db.sql("""
+			SELECT DISTINCT e.name, e.employee_name, e.holiday_list
+			FROM `tabEmployee` e
+			INNER JOIN `tabDepartment Approver` ela ON ela.parent = e.name
+			WHERE ela.approver = %s AND e.status = 'Active'
+		""", (filters["approver"],), as_dict=True)
+		# employees = frappe.get_all(
+		# 	"Employee",
+		# 	filters={
+		# 		"user_id": ["!=", filters["approver"]]
+		# 	},
+		# 	or_filters=[
+		# 		{"reports_to": filters["approver"]},
+		# 		{"custom_reporting_manager_l1": filters["approver"]},
+		# 		{"custom_reporting_manager_l2": filters["approver"]},
+		# 		{"leave_approver": filters["approver"]}
+		# 	],
+		# 	fields=["name"]
+		# )
+		employee_list = [e["name"] for e in managed_employees]
 		usable_filters["employee"] = ["in", employee_list]
 	attendance_regularization_requests = frappe.get_all(
 		"Attendance Regularization",
