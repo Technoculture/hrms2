@@ -979,7 +979,7 @@ def get_leave_details(employee, date, for_salary_slip=False):
 
 		leaves_taken = get_leaves_for_period(employee, d, allocation.from_date, to_date) * -1
 		leaves_pending = get_leaves_pending_approval_for_period(employee, d, allocation.from_date, to_date)
-		expired_leaves = allocation.total_leaves_allocated - (remaining_leaves + leaves_taken + leaves_pending)
+		expired_leaves = allocation.total_leaves_allocated - (remaining_leaves + leaves_taken)
 		leave_allocation[d] = {
 			"total_leaves": flt(allocation.total_leaves_allocated, precision),
 			"expired_leaves": flt(expired_leaves, precision) if expired_leaves > 0 else 0,
@@ -1029,14 +1029,14 @@ def get_leave_balance_on(
 
 	end_date = allocation.to_date if cint(consider_all_leaves_in_the_allocation_period) else date
 	cf_expiry = get_allocation_expiry_for_cf_leaves(employee, leave_type, to_date, allocation.from_date)
-	pending_leaves = get_leaves_pending_approval_for_period(employee, leave_type, allocation.from_date, to_date)
+	# pending_leaves = get_leaves_pending_approval_for_period(employee, leave_type, allocation.from_date, to_date)
 
 	leaves_taken = get_leaves_for_period(employee, leave_type, allocation.from_date, end_date)
 	# leaves_taken += pending_leaves
 	remaining_leaves = get_remaining_leaves(allocation, leaves_taken, date, cf_expiry)
-	remaining_leaves["leave_balance"] -= pending_leaves
-	remaining_leaves["leave_balance_for_consumption"] -= pending_leaves
-	print("remaining_leaves", remaining_leaves)
+	# remaining_leaves["leave_balance"] -= pending_leaves
+	# remaining_leaves["leave_balance_for_consumption"] -= pending_leaves
+	# print("remaining_leaves", remaining_leaves)
 
 	if for_consumption:
 		return remaining_leaves
