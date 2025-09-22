@@ -47,12 +47,7 @@ const quickLinks = [
 		icon: markRaw(LeaveIcon),
 		title: __("Request Leave"),
 		route: "LeaveApplicationFormView",
-	},
-	{
-		icon: markRaw(SundayHolidayWorkingIcon),
-		title: __("Sunday/Holiday Working"),
-		route: "SundayHolidayWorkingRequestFormView",
-	},
+	},	
 	// {
 	// 	icon: markRaw(ExpenseIcon),
 	// 	title: __("Claim an Expense"),
@@ -75,8 +70,8 @@ const quickLinks = [
 	},
 	{
 		icon: markRaw(SundayHolidayWorkingIcon),
-		title: __("Sunday/Holiday History"),
-		route: "SundayHolidayWorkingRequestHistoryView",
+		title: __("Sunday/Holiday Working Request"),
+		route: "SundayHolidayWorkingRequestFormView",
 	},
 	// {
 	// 	icon: markRaw(RegularizationIcon),

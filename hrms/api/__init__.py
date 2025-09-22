@@ -1635,19 +1635,6 @@ def get_attendance_regularization_requests(employee: str, filters: dict) -> list
 			INNER JOIN `tabDepartment Approver` ela ON ela.parent = e.name
 			WHERE ela.approver = %s AND e.status = 'Active'
 		""", (filters["approver"],), as_dict=True)
-		# employees = frappe.get_all(
-		# 	"Employee",
-		# 	filters={
-		# 		"user_id": ["!=", filters["approver"]]
-		# 	},
-		# 	or_filters=[
-		# 		{"reports_to": filters["approver"]},
-		# 		{"custom_reporting_manager_l1": filters["approver"]},
-		# 		{"custom_reporting_manager_l2": filters["approver"]},
-		# 		{"leave_approver": filters["approver"]}
-		# 	],
-		# 	fields=["name"]
-		# )
 		employee_list = [e["name"] for e in managed_employees]
 		usable_filters["employee"] = ["in", employee_list]
 	attendance_regularization_requests = frappe.get_all(
@@ -1657,3 +1644,30 @@ def get_attendance_regularization_requests(employee: str, filters: dict) -> list
 		limit=200
 	)
 	return attendance_regularization_requests
+
+@frappe.whitelist()
+def get_sunday_holiday_working_requests_for_approver(approver: str) -> list[dict]:
+	"""
+	Get Sunday/Holiday Working Request documents for employees managed by the given approver (employee).
+	Args:
+		employee (str): Employee ID of the approver
+	Returns:
+		list[dict]: List of Sunday/Holiday Working Request documents for managed employees
+	"""
+	# Find employees managed by this approver
+	managed_employees = frappe.db.sql("""
+		SELECT DISTINCT e.name
+		FROM `tabEmployee` e
+		INNER JOIN `tabDepartment Approver` ela ON ela.parent = e.name
+		WHERE ela.approver = %s AND e.status = 'Active'
+	""", (approver,), as_dict=True)
+	employee_list = [e["name"] for e in managed_employees]
+	if not employee_list:
+		return []
+	sunday_holiday_requests = frappe.get_all(
+		"Sunday Holiday Working Request",
+		filters={"employee": ["in", employee_list]},
+		fields="*",
+		limit=200
+	)
+	return sunday_holiday_requests

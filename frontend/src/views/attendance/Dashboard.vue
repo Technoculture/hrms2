@@ -85,6 +85,80 @@
 					</div>
 				</div>
 				<div>
+					<div class="text-lg text-gray-800 font-bold mb-3">{{ __("Recent Sunday/Holiday Working Requests") }}</div>
+					
+					<!-- Tab Buttons for Sunday/Holiday Working -->
+					<TabButtons
+						:buttons="SUNDAY_HOLIDAY_TAB_BUTTONS"
+						v-model="sundayHolidayActiveTab"
+						class="mb-4"
+					/>
+
+					<!-- My Sunday/Holiday Requests Tab -->
+					<div v-if="sundayHolidayActiveTab === 'My Requests'">
+						<div class="flex flex-col bg-white rounded overflow-hidden" v-if="mySundayHolidayWorkingRequests.data?.length">
+							<div
+								class="flex flex-row p-3.5 items-center justify-between border-b cursor-pointer"
+								v-for="request in mySundayHolidayWorkingRequests.data.slice(0, 5)"
+								:key="request.name"
+								@click="viewSundayHolidayRequest(request)"
+							>
+								<SundayHolidayWorkingRequestHistoryItem
+									:doc="request"
+									:showEmployee="false"
+								/>
+							</div>
+							<router-link
+								:to="{ name: 'SundayHolidayWorkingRequestHistoryView' }"
+								v-slot="{ navigate }"
+							>
+								<Button
+									variant="ghost"
+									@click="navigate"
+									class="w-full !text-gray-600 py-6 text-sm border-none bg-white hover:bg-white"
+								>
+									{{ __("View All") }}
+								</Button>
+							</router-link>
+						</div>
+						<div v-else class="bg-white rounded p-8 text-center text-gray-500">
+							{{ __('You have not submitted any Sunday/Holiday working requests') }}
+						</div>
+					</div>
+
+					<!-- Team Sunday/Holiday Requests Tab -->
+					<div v-if="sundayHolidayActiveTab === 'Team Requests'">
+						<div class="flex flex-col bg-white rounded overflow-hidden" v-if="teamSundayHolidayWorkingRequests.data?.length">
+							<div
+								class="flex flex-row p-3.5 items-center justify-between border-b cursor-pointer"
+								v-for="request in teamSundayHolidayWorkingRequests.data.slice(0, 5)"
+								:key="request.name"
+								@click="viewSundayHolidayRequest(request)"
+							>
+								<SundayHolidayWorkingRequestHistoryItem
+									:doc="request"
+									:showEmployee="true"
+								/>
+							</div>
+							<router-link
+								:to="{ name: 'SundayHolidayWorkingRequestHistoryView' }"
+								v-slot="{ navigate }"
+							>
+								<Button
+									variant="ghost"
+									@click="navigate"
+									class="w-full !text-gray-600 py-6 text-sm border-none bg-white hover:bg-white"
+								>
+									{{ __("View All") }}
+								</Button>
+							</router-link>
+						</div>
+						<div v-else class="bg-white rounded p-8 text-center text-gray-500">
+							{{ __('No Sunday/Holiday working requests from your team') }}
+						</div>
+					</div>
+				</div>
+				<div>
 					<div class="text-lg text-gray-800 font-bold">{{ __("My Shifts") }}</div>
 					<RequestList
 						:component="markRaw(ShiftAssignmentItem)"
@@ -126,6 +200,7 @@ import ShiftAssignmentItem from "@/components/ShiftAssignmentItem.vue"
 import RequestList from "@/components/RequestList.vue"
 import AttendanceCalendar from "@/components/AttendanceCalendar.vue"
 import AttendanceRegularizationItem from "@/components/AttendanceRegularizationItem.vue"
+import SundayHolidayWorkingRequestHistoryItem from "@/components/SundayHolidayWorkingRequestHistoryItem.vue"
 import TabButtons from "@/components/TabButtons.vue"
 import { useRouter } from "vue-router"
 
@@ -135,6 +210,7 @@ import {
 	getShiftTiming,
 } from "@/data/attendance"
 import { myRegularisationRequests, teamRegularisationRequests } from "@/data/regularisation"
+import { mySundayHolidayWorkingRequests, teamSundayHolidayWorkingRequests } from "@/data/sundayHolidayWorkingRequest"
 
 const __ = inject("$translate")
 const employee = inject("$employee")
@@ -143,6 +219,8 @@ const router = useRouter()
 
 const TAB_BUTTONS = ["My Requests", "Team Requests"]
 const activeTab = ref("My Requests")
+const SUNDAY_HOLIDAY_TAB_BUTTONS = ["My Requests", "Team Requests"]
+const sundayHolidayActiveTab = ref("My Requests")
 const shifts = createResource({
 	url: "hrms.api.get_shifts",
 	auto: true,
@@ -166,6 +244,13 @@ const shifts = createResource({
 function viewRequest(request) {
 	router.push({
 		name: 'AttendanceRegularizationDetailView',
+		params: { id: request.name }
+	})
+}
+
+function viewSundayHolidayRequest(request) {
+	router.push({
+		name: 'SundayHolidayWorkingRequestDetailView',
 		params: { id: request.name }
 	})
 }
