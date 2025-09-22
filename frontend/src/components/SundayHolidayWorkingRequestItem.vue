@@ -21,7 +21,7 @@
 			</div>
 		</div>
 		<div class="text-sm text-gray-700" v-if="doc.work_description">
-			{{ truncateText(doc.work_description, 100) }}
+			{{ truncateText(doc.work_description, 20) }}
 		</div>
 		<div class="text-sm text-red-600" v-if="doc.status === 'Rejected' && doc.rejection_reason">
 			<span class="font-medium">Rejection Reason:</span> {{ doc.rejection_reason }}

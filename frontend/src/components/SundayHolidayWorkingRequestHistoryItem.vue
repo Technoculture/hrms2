@@ -12,7 +12,7 @@
 					<div class="flex items-center gap-2 mb-1">
 						<span class="text-xs text-gray-900">
 							
-							<span v-if="props.showEmployee">
+							<span>
 								{{ getEmployeeName(props.doc) }} {{ props.doc.employee ? "(" + props.doc.employee + ")" : "" }}
 							</span>
 						</span>
@@ -21,7 +21,7 @@
 						{{ formatDate(props.doc.work_date) }} • {{ formatRelativeTime(props.doc.creation) }}
 					</p>
 					<p class="text-xs text-gray-600 mt-1 truncate" v-if="props.doc.work_description">
-						{{ truncateText(props.doc.work_description, 60) }}
+						{{ truncateText(props.doc.work_description, 20) }}
 					</p>
 				</div>
 			</div>
