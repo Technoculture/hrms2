@@ -10,6 +10,19 @@ from erpnext.setup.doctype.employee.employee import get_all_employee_emails, get
 from hrms.hr.utils import get_holidays_for_employee
 
 
+def get_all_employee_emails_reporting_manager(reporting_manager_user):
+	employees = frappe.get_all(
+		"Employee", fields=["name", "employee_name"], filters={"custom_reporting_manager_l1": reporting_manager_user, "status": "Active"})
+	employee_emails = []
+	for employee in employees:
+		user, company_email, personal_email = frappe.db.get_value(
+			"Employee", employee, ["user_id", "company_email", "personal_email"]
+		)
+		email = user or company_email or personal_email
+		if email:
+			employee_emails.append(email)
+	return employee_emails
+
 # -----------------
 # HOLIDAY REMINDERS
 # -----------------
@@ -94,8 +107,8 @@ def send_birthday_reminders():
 	sender = get_sender_email()
 	employees_born_today = get_employees_who_are_born_today()
 
-	for company, birthday_persons in employees_born_today.items():
-		employee_emails = get_all_employee_emails(company)
+	for custom_reporting_manager_l1, birthday_persons in employees_born_today.items():
+		employee_emails = get_all_employee_emails_reporting_manager(custom_reporting_manager_l1)
 		birthday_person_emails = [get_employee_email(doc) for doc in birthday_persons]
 		recipients = list(set(employee_emails) - set(birthday_person_emails))
 
@@ -144,7 +157,7 @@ def send_birthday_reminder(recipients, reminder_text, birthday_persons, message,
 
 def get_employees_who_are_born_today():
 	"""Get all employee born today & group them based on their company"""
-	return get_employees_having_an_event_today("birthday")
+	return get_employees_having_an_event_today_reporting_manager("birthday")
 
 
 def get_employees_having_an_event_today(event_type):
@@ -200,6 +213,58 @@ def get_employees_having_an_event_today(event_type):
 
 	return grouped_employees
 
+def get_employees_having_an_event_today_reporting_manager(event_type):
+	"""Get all employee who have `event_type` today
+	& group them based on their company. `event_type`
+	can be `birthday` or `work_anniversary`"""
+
+	from collections import defaultdict
+
+	# Set column based on event type
+	if event_type == "birthday":
+		condition_column = "date_of_birth"
+	elif event_type == "work_anniversary":
+		condition_column = "date_of_joining"
+	else:
+		return
+
+	employees_born_today = frappe.db.multisql(
+		{
+			"mariadb": f"""
+			SELECT `personal_email`, `company`, `company_email`, `user_id`, `employee_name` AS 'name', `image`, `date_of_joining`, `custom_reporting_manager_l1`
+			FROM `tabEmployee`
+			WHERE
+				DAY({condition_column}) = DAY(%(today)s)
+			AND
+				MONTH({condition_column}) = MONTH(%(today)s)
+			AND
+				YEAR({condition_column}) < YEAR(%(today)s)
+			AND
+				`status` = 'Active'
+		""",
+			"postgres": f"""
+			SELECT "personal_email", "company", "company_email", "user_id", "employee_name" AS 'name', "image", "custom_reporting_manager_l1"
+			FROM "tabEmployee"
+			WHERE
+				DATE_PART('day', {condition_column}) = date_part('day', %(today)s)
+			AND
+				DATE_PART('month', {condition_column}) = date_part('month', %(today)s)
+			AND
+				DATE_PART('year', {condition_column}) < date_part('year', %(today)s)
+			AND
+				"status" = 'Active'
+		""",
+		},
+		dict(today=today(), condition_column=condition_column),
+		as_dict=1,
+	)
+
+	grouped_employees = defaultdict(lambda: [])
+
+	for employee_doc in employees_born_today:
+		grouped_employees[employee_doc.get("custom_reporting_manager_l1")].append(employee_doc)
+
+	return grouped_employees
 
 # --------------------------
 # WORK ANNIVERSARY REMINDERS
@@ -211,14 +276,14 @@ def send_work_anniversary_reminders():
 		return
 
 	sender = get_sender_email()
-	employees_joined_today = get_employees_having_an_event_today("work_anniversary")
+	employees_joined_today = get_employees_having_an_event_today_reporting_manager("work_anniversary")
 
 	message = _("A friendly reminder of an important date for our team.")
 	message += "<br>"
 	message += _("Everyone, let’s congratulate them on their work anniversary!")
 
-	for company, anniversary_persons in employees_joined_today.items():
-		employee_emails = get_all_employee_emails(company)
+	for custom_reporting_manager_l1, anniversary_persons in employees_joined_today.items():
+		employee_emails = get_all_employee_emails_reporting_manager(custom_reporting_manager_l1)
 		anniversary_person_emails = [get_employee_email(doc) for doc in anniversary_persons]
 		recipients = list(set(employee_emails) - set(anniversary_person_emails))
 
