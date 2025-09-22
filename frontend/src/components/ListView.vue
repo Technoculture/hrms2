@@ -151,6 +151,7 @@ import ShiftAssignmentItem from "@/components/ShiftAssignmentItem.vue"
 import LeaveRequestItem from "@/components/LeaveRequestItem.vue"
 import ExpenseClaimItem from "@/components/ExpenseClaimItem.vue"
 import EmployeeAdvanceItem from "@/components/EmployeeAdvanceItem.vue"
+import SundayHolidayWorkingRequestItem from "@/components/SundayHolidayWorkingRequestItem.vue"
 import ListFiltersActionSheet from "@/components/ListFiltersActionSheet.vue"
 import CustomIonModal from "@/components/CustomIonModal.vue"
 import RequestActionSheet from "@/components/RequestActionSheet.vue"
@@ -198,6 +199,7 @@ const listItemComponent = {
 	"Leave Application": markRaw(LeaveRequestItem),
 	"Expense Claim": markRaw(ExpenseClaimItem),
 	"Employee Advance": markRaw(EmployeeAdvanceItem),
+	"Sunday Holiday Working Request": markRaw(SundayHolidayWorkingRequestItem),
 }
 
 const router = useRouter()

@@ -28,6 +28,7 @@ import RegularizationIcon from "@/components/icons/RegularizationIcon.vue"
 import ExpenseIcon from "@/components/icons/ExpenseIcon.vue"
 import EmployeeAdvanceIcon from "@/components/icons/EmployeeAdvanceIcon.vue"
 import SalaryIcon from "@/components/icons/SalaryIcon.vue"
+import SundayHolidayWorkingIcon from "@/components/icons/SundayHolidayWorkingIcon.vue"
 
 const __ = inject("$translate")
 
@@ -46,6 +47,11 @@ const quickLinks = [
 		icon: markRaw(LeaveIcon),
 		title: __("Request Leave"),
 		route: "LeaveApplicationFormView",
+	},
+	{
+		icon: markRaw(SundayHolidayWorkingIcon),
+		title: __("Sunday/Holiday Working"),
+		route: "SundayHolidayWorkingRequestFormView",
 	},
 	// {
 	// 	icon: markRaw(ExpenseIcon),
@@ -66,6 +72,11 @@ const quickLinks = [
 		icon: markRaw(AttendanceIcon),
 		title: __("Attendance Summary"),
 		route: "AttendanceHistoryView",
+	},
+	{
+		icon: markRaw(SundayHolidayWorkingIcon),
+		title: __("Sunday/Holiday History"),
+		route: "SundayHolidayWorkingRequestHistoryView",
 	},
 	// {
 	// 	icon: markRaw(RegularizationIcon),

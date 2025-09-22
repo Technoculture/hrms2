@@ -264,3 +264,46 @@ export const EMPLOYEE_CHECKIN_FIELDS = [
 		fieldtype: "geolocation",
 	},
 ]
+
+export const SUNDAY_HOLIDAY_WORKING_REQUEST_FIELDS = [
+	{
+		fieldname: "name",
+		label: "ID",
+		fieldtype: "Data",
+	},
+	{
+		fieldname: "employee",
+		label: "Employee",
+		fieldtype: "Link",
+	},
+	{
+		fieldname: "employee_name",
+		label: "Employee Name",
+		fieldtype: "Data",
+	},
+	{
+		fieldname: "work_date",
+		label: "Work Date",
+		fieldtype: "Date",
+	},
+	{
+		fieldname: "work_date_formatted",
+		label: "Work Date",
+		fieldtype: "Data",
+	},
+	{
+		fieldname: "status",
+		label: "Status",
+		fieldtype: "Select",
+	},
+	{
+		fieldname: "work_description",
+		label: "Work Description",
+		fieldtype: "Long Text",
+	},
+	{
+		fieldname: "rejection_reason",
+		label: "Rejection Reason",
+		fieldtype: "Long Text",
+	},
+]

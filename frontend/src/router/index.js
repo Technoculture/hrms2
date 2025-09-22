@@ -6,6 +6,7 @@ import leaveRoutes from "./leaves"
 import claimRoutes from "./claims"
 import employeeAdvanceRoutes from "./advances"
 import salarySlipRoutes from "./salary_slips"
+import sundayHolidayWorkingRequestRoutes from "./sundayHolidayWorkingRequest"
 
 const routes = [
 	{
@@ -44,6 +45,11 @@ const routes = [
 				path: "/dashboard/salary-slips",
 				name: "SalarySlipsDashboard",
 				component: () => import("@/views/salary_slip/Dashboard.vue"),
+			},
+			{
+				path: "/dashboard/sunday-holiday-working",
+				name: "SundayHolidayWorkingDashboard",
+				component: () => import("@/views/sundayHolidayWorkingRequest/Dashboard.vue"),
 			},
 			// {
 			// 	path: "/regularization",
@@ -87,6 +93,7 @@ const routes = [
 	...claimRoutes,
 	...employeeAdvanceRoutes,
 	...salarySlipRoutes,
+	...sundayHolidayWorkingRequestRoutes,
 ]
 
 const router = createRouter({
