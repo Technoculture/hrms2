@@ -151,28 +151,12 @@ const myRequests = createResource({
 })
 
 const teamRequests = createResource({
-	url: "frappe.client.get_list",
-	makeParams() {
-		return {
-			doctype: "Sunday Holiday Working Request",
-			fields: [
-				"name",
-				"employee",
-				"employee_name",
-				"work_date",
-				"status",
-				"work_description",
-				"rejection_reason",
-				"creation",
-				"modified",
-				"docstatus"
-			],
-			filters: {
-				employee: ["!=", employee.data?.name]				
-			},
-			order_by: "creation desc",
-		}
+	url: "hrms.api.get_sunday_holiday_working_requests_for_approver",
+	params: {
+		approver: employee.data.user_id,
 	},
+	auto: true,
+	cache: "hrms:team_sunday_holiday_working_requests",
 })
 
 // Watch for tab changes to load team requests when needed
