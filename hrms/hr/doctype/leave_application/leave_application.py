@@ -510,6 +510,8 @@ class LeaveApplication(Document, PWANotificationsMixin):
 				# Allow 2 half-day leaves (0.5 + 0.5 = 1.0)
 				if total_leaves_on_half_day >= 1.0:
 					self.throw_overlap_error(d)
+			else:
+				self.throw_overlap_error(d)		
 
 			# if (
 			# 	cint(self.half_day) == 1
