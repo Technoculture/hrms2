@@ -165,8 +165,21 @@
 						@handleFileDelete="handleFileDelete"
 					/>
 				</div>
+				<div v-if="props.doctype === 'Sunday Holiday Working Request'" class=" text-gray-500 space-y-4 p-4">
+					<p class="font-medium">
+						You may submit a request only for dates that meet <b>all</b> of the following requirements:
+					</p>
+					<ul class="list-disc list-inside space-y-1">
+						<li>
+							<b>Work Date:</b> The work date must be on or after tomorrow and must be weekly off or holiday. Requests for past or today's dates are not allowed
+						</li>
+						<li>
+							<b>Within This Week or Upcoming Sunday:</b> Only dates in the current calendar week (Monday to Sunday) or the upcoming Sunday are allowed.
+						</li>
+					</ul>
+				</div>
 			</div>
-
+			
 			<!-- Form Primary/Secondary Button -->
 			<!-- custom form button eg: Download button in salary slips -->
 			<div
@@ -212,6 +225,7 @@
 			</div>
 		</div>
 	</div>
+	
 
 	<!-- Confirmation Dialogs -->
 	<Dialog v-model="showDeleteDialog">
