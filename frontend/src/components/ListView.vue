@@ -287,20 +287,56 @@ function applyLocalFilters(docs) {
 		return docs
 	}
 
+	const toComparable = (value) => {
+		if (value === undefined || value === null || value === "") {
+			return null
+		}
+
+		const valueAsString = `${value}`.trim()
+		if (/^-?\d+(\.\d+)?$/.test(valueAsString)) {
+			return Number(valueAsString)
+		}
+
+		const dateValue = dayjs(value)
+		if (dateValue.isValid()) {
+			return dateValue.valueOf()
+		}
+
+		return valueAsString.toLowerCase()
+	}
+
 	return docs.filter((doc) => {
 		return appliedFilters.value.every((filter) => {
 			const [, fieldname, condition, value] = filter
 			const docValue = doc?.[fieldname]
 			if (!condition) return true
+			const normalizedCondition = `${condition}`.trim()
 
-			if (condition === "=") {
+			if (normalizedCondition === "=") {
 				return `${docValue ?? ""}` === `${value ?? ""}`
 			}
-			if (condition === "!=") {
+			if (normalizedCondition === "!=") {
 				return `${docValue ?? ""}` !== `${value ?? ""}`
 			}
-			if (condition === "Like" || condition === "like") {
+			if (normalizedCondition === "Like" || normalizedCondition === "like") {
 				return `${docValue ?? ""}`.toLowerCase().includes(`${value ?? ""}`.toLowerCase())
+			}
+			if (
+				normalizedCondition === ">" ||
+				normalizedCondition === "<" ||
+				normalizedCondition === ">=" ||
+				normalizedCondition === "<="
+			) {
+				const left = toComparable(docValue)
+				const right = toComparable(value)
+				if (left === null || right === null) {
+					return false
+				}
+
+				if (normalizedCondition === ">") return left > right
+				if (normalizedCondition === "<") return left < right
+				if (normalizedCondition === ">=") return left >= right
+				if (normalizedCondition === "<=") return left <= right
 			}
 
 			return true
@@ -331,9 +367,9 @@ const documents = createResource({
 			})
 			return doc
 		})
-		// filter out non-managed employees only for team requests
+		// Team requests must always be scoped to managed employees.
 		const managedEmployees = managed_employees.data || []
-		if (isTeamRequest.value && managedEmployees.length) {
+		if (isTeamRequest.value) {
 			docs = docs.filter((item) => managedEmployees.includes(item.employee))
 		}
 		 
@@ -493,6 +529,15 @@ watch(
 	() => activeTab.value,
 	(_value) => {
 		fetchDocumentList()
+	}
+)
+
+watch(
+	() => managed_employees.loading,
+	(isLoading, wasLoading) => {
+		if (wasLoading && !isLoading && isTeamRequest.value) {
+			fetchDocumentList()
+		}
 	}
 )
 
