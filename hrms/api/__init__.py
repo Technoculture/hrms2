@@ -62,20 +62,33 @@ def get_current_employee_info() -> dict:
 
 @frappe.whitelist()
 def get_all_employees() -> list[dict]:
-	return frappe.get_all(
-		"Employee",
-		fields=[
-			"name",
-			"employee_name",
-			"designation",
-			"department",
-			"company",
-			"reports_to",
-			"user_id",
-			"image",
-			"status",
-		],
-		limit=999999,
+	employee = frappe.qb.DocType("Employee")
+	user = frappe.qb.DocType("User")
+
+	return (
+		frappe.qb.from_(employee)
+		.left_join(user)
+		.on(user.name == employee.user_id)
+		.select(
+			employee.name,
+			employee.employee_name,
+			employee.designation,
+			employee.department,
+			employee.company,
+			employee.reports_to,
+			employee.user_id,
+			employee.image,
+			employee.status,
+		)
+		.where(employee.status == "Active")
+		.where(
+			(employee.user_id.isnull())
+			| (employee.user_id == "")
+			| (user.enabled == 1)
+		)
+		.orderby(employee.employee_name, order=Order.asc)
+		.limit(999999)
+		.run(as_dict=True)
 	)
 
 
