@@ -639,6 +639,15 @@ class LeaveApplication(Document, PWANotificationsMixin):
 			fields=["name", "attendance_date"],
 			order_by="attendance_date",
 		)
+
+		# Allow half-day leave approval when attendance exists on the half_day_date.
+		# This supports cases where attendance is marked for the non-leave session.
+		if self.half_day and self.half_day_date:
+			half_day_date = getdate(self.half_day_date)
+			attendance_dates = [
+				a for a in attendance_dates if getdate(a.attendance_date) != half_day_date
+			]
+
 		if attendance_dates:
 			frappe.throw(
 				_("Attendance for employee {0} is already marked for the following dates: {1}").format(

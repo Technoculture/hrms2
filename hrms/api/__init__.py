@@ -486,13 +486,40 @@ def get_managed_employees(
 	"""
 	Return the employee names (primary keys)
 	"""
-	managed_employees = frappe.db.sql("""
+	managed_employees = _get_managed_employees_for_approver(approver_id)
+	return [emp.name for emp in managed_employees]
+
+
+def _get_managed_employees_for_approver(approver_id: str | None) -> list[dict]:
+	"""
+	Resolve managed employees for an approver across custom + department mappings.
+	"""
+	if not approver_id:
+		return []
+
+	return frappe.db.sql(
+		"""
 		SELECT DISTINCT e.name, e.employee_name, e.holiday_list
 		FROM `tabEmployee` e
-		INNER JOIN `tabDepartment Approver` ela ON ela.parent = e.name
-		WHERE ela.approver = %s AND e.status = 'Active'
-	""", (approver_id,), as_dict=True)
-	return [employee.name for employee in managed_employees]
+		LEFT JOIN `tabDepartment Approver` emp_approver
+			ON emp_approver.parent = e.name
+			AND emp_approver.parenttype = 'Employee'
+			AND emp_approver.parentfield = 'custom_leave_approvers'
+		LEFT JOIN `tabDepartment Approver` dept_approver
+			ON dept_approver.parent = e.department
+			AND dept_approver.parenttype = 'Department'
+			AND dept_approver.parentfield = 'leave_approvers'
+		WHERE e.status = 'Active'
+			AND (
+				emp_approver.approver = %(approver)s
+				OR dept_approver.approver = %(approver)s
+				OR e.leave_approver = %(approver)s
+				OR e.custom_reporting_manager_l1 = %(approver)s
+			)
+		""",
+		{"approver": approver_id},
+		as_dict=True,
+	)
 
 
 
@@ -512,13 +539,11 @@ def get_leave_applications_for_approval(
 		limit: int | None
 	Returns:
 		list[dict]: List of leave applications
-	"""	
-	managed_employees = frappe.db.sql("""
-		SELECT DISTINCT e.name, e.employee_name, e.holiday_list
-		FROM `tabEmployee` e
-		INNER JOIN `tabDepartment Approver` ela ON ela.parent = e.name
-		WHERE ela.approver = %s AND e.status = 'Active'
-	""", (approver_id,), as_dict=True)
+	"""
+	managed_employees = _get_managed_employees_for_approver(approver_id)
+	if not managed_employees:
+		return []
+
 	filters = get_filters("Leave Application", employee, None, for_approval)
 	fields = [
 		"name",
@@ -669,15 +694,10 @@ def get_today_holidays_for_employee(employee: str) -> dict:
 	"""
 	current_user = frappe.db.get_value("Employee", employee, "user_id")
 	today = getdate()
-	
-	# Check if current employee is a manager by finding employees who have them as leave approver
-	managed_employees = frappe.db.sql("""
-		SELECT DISTINCT e.name, e.employee_name, e.holiday_list
-		FROM `tabEmployee` e
-		INNER JOIN `tabDepartment Approver` ela ON ela.parent = e.name
-		WHERE ela.approver = %s AND e.status = 'Active'
-	""", (current_user,), as_dict=True)	
-	
+
+	# Check if current employee manages any employees.
+	managed_employees = _get_managed_employees_for_approver(current_user)
+
 	is_manager = len(managed_employees) > 0
 	holiday_lists_data = []
 	
@@ -1138,7 +1158,10 @@ def download_salary_slip(name: str):
 	try:
 		download_pdf("Salary Slip", name, format=default_print_format)
 	except Exception:
-		frappe.throw(_("Failed to download Salary Slip PDF"))
+		try:
+			download_pdf("Salary Slip", name, format="Standard")
+		except Exception:
+			frappe.throw(_("Failed to download Salary Slip PDF"))
 
 	base64content = base64.b64encode(frappe.local.response.filecontent)
 	content_type = frappe.local.response.type
@@ -1629,12 +1652,7 @@ def get_attendance_regularization_requests(employee: str, filters: dict) -> list
 		usable_filters["employee"] = filters["employee"]
 	# when approver is provided, then get the employees under the approver
 	if filters.get("approver"):
-		managed_employees = frappe.db.sql("""
-			SELECT DISTINCT e.name, e.employee_name, e.holiday_list
-			FROM `tabEmployee` e
-			INNER JOIN `tabDepartment Approver` ela ON ela.parent = e.name
-			WHERE ela.approver = %s AND e.status = 'Active'
-		""", (filters["approver"],), as_dict=True)
+		managed_employees = _get_managed_employees_for_approver(filters["approver"])
 		employee_list = [e["name"] for e in managed_employees]
 		usable_filters["employee"] = ["in", employee_list]
 	attendance_regularization_requests = frappe.get_all(
@@ -1655,12 +1673,7 @@ def get_sunday_holiday_working_requests_for_approver(approver: str) -> list[dict
 		list[dict]: List of Sunday/Holiday Working Request documents for managed employees
 	"""
 	# Find employees managed by this approver
-	managed_employees = frappe.db.sql("""
-		SELECT DISTINCT e.name
-		FROM `tabEmployee` e
-		INNER JOIN `tabDepartment Approver` ela ON ela.parent = e.name
-		WHERE ela.approver = %s AND e.status = 'Active'
-	""", (approver,), as_dict=True)
+	managed_employees = _get_managed_employees_for_approver(approver)
 	employee_list = [e["name"] for e in managed_employees]
 	if not employee_list:
 		return []
