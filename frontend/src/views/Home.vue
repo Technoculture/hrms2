@@ -73,6 +73,11 @@ const quickLinks = [
 		title: __("Sunday/Holiday Working Request"),
 		route: "SundayHolidayWorkingRequestFormView",
 	},
+	{
+		icon: markRaw(AttendanceIcon),
+		title: __("Remote Work Request"),
+		route: "RemoteWorkRequestFormView",
+	},
 	// {
 	// 	icon: markRaw(RegularizationIcon),
 	// 	title: __("Regularization History"),

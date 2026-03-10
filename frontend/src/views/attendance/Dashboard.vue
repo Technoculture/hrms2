@@ -159,6 +159,34 @@
 					</div>
 				</div>
 				<div>
+					<div class="text-lg text-gray-800 font-bold mb-3">{{ __("Recent Remote Work Requests") }}</div>
+					<div class="flex flex-col bg-white rounded overflow-hidden" v-if="myRemoteWorkRequests.data?.length">
+						<div
+							class="flex flex-row p-3.5 items-center justify-between border-b cursor-pointer"
+							v-for="request in myRemoteWorkRequests.data.slice(0, 5)"
+							:key="request.name"
+							@click="viewRemoteWorkRequest(request)"
+						>
+							<RemoteWorkRequestHistoryItem :doc="request" />
+						</div>
+						<router-link
+							:to="{ name: 'RemoteWorkRequestHistoryView' }"
+							v-slot="{ navigate }"
+						>
+							<Button
+								variant="ghost"
+								@click="navigate"
+								class="w-full !text-gray-600 py-6 text-sm border-none bg-white hover:bg-white"
+							>
+								{{ __("View All") }}
+							</Button>
+						</router-link>
+					</div>
+					<div v-else class="bg-white rounded p-8 text-center text-gray-500">
+						{{ __('You have not submitted any remote work requests') }}
+					</div>
+				</div>
+				<div>
 					<div class="text-lg text-gray-800 font-bold">{{ __("My Shifts") }}</div>
 					<RequestList
 						:component="markRaw(ShiftAssignmentItem)"
@@ -201,6 +229,7 @@ import RequestList from "@/components/RequestList.vue"
 import AttendanceCalendar from "@/components/AttendanceCalendar.vue"
 import AttendanceRegularizationItem from "@/components/AttendanceRegularizationItem.vue"
 import SundayHolidayWorkingRequestHistoryItem from "@/components/SundayHolidayWorkingRequestHistoryItem.vue"
+import RemoteWorkRequestHistoryItem from "@/components/RemoteWorkRequestHistoryItem.vue"
 import TabButtons from "@/components/TabButtons.vue"
 import { useRouter } from "vue-router"
 
@@ -211,6 +240,7 @@ import {
 } from "@/data/attendance"
 import { myRegularisationRequests, teamRegularisationRequests } from "@/data/regularisation"
 import { mySundayHolidayWorkingRequests, teamSundayHolidayWorkingRequests } from "@/data/sundayHolidayWorkingRequest"
+import { myRemoteWorkRequests } from "@/data/remoteWorkRequest"
 
 const __ = inject("$translate")
 const employee = inject("$employee")
@@ -252,6 +282,13 @@ function viewSundayHolidayRequest(request) {
 	router.push({
 		name: 'SundayHolidayWorkingRequestDetailView',
 		params: { id: request.name }
+	})
+}
+
+function viewRemoteWorkRequest(request) {
+	router.push({
+		name: "RemoteWorkRequestDetailView",
+		params: { id: request.name },
 	})
 }
 
