@@ -59,7 +59,7 @@
 
 				<div
 					class="flex flex-col bg-white rounded mt-5"
-					v-if="!documents.loading && documents.data?.length && !managed_employees.loading"
+					v-if="!isListLoading && documents.data?.length"
 				>
 					<div
 						class="p-3.5 items-center justify-between border-b cursor-pointer"
@@ -91,11 +91,11 @@
 				</div>
 				<EmptyState
 					:message="__('No {0} found', [props.doctype?.toLowerCase()])"
-					v-else-if="!documents.loading"
+					v-else-if="!isListLoading"
 				/>
 
 				<!-- Loading Indicator -->
-				<div v-if="documents.loading || managed_employees.loading" class="flex mt-2 items-center justify-center">
+				<div v-if="isListLoading" class="flex mt-2 items-center justify-center">
 					<LoadingIndicator class="w-8 h-8 text-gray-800" />
 				</div>
 			</div>
@@ -130,7 +130,7 @@
 </template>
 
 <script setup>
-import { useRouter } from "vue-router"
+import { useRoute, useRouter } from "vue-router"
 import { inject, ref, markRaw, watch, computed, reactive, onMounted } from "vue"
 import {
 	modalController,
@@ -203,11 +203,11 @@ const listItemComponent = {
 }
 
 const router = useRouter()
+const route = useRoute()
 const dayjs = inject("$dayjs")
 const socket = inject("$socket")
 const employee = inject("$employee")
 const filterMap = reactive({})
-const activeTab = ref(props.tabButtons ? getButtonKey(props.tabButtons[0]) : undefined)
 const areFiltersApplied = ref(false)
 const appliedFilters = ref([])
 const workflowStateField = ref(null)
@@ -225,9 +225,26 @@ const listOptions = ref({
 	page_length: 50,
 })
 
+const resolveActiveTab = (tab) => {
+	if (!props.tabButtons?.length) return undefined
+
+	const requestedTab = typeof tab === "string" ? tab : null
+	if (requestedTab && props.tabButtons.some((button) => getButtonKey(button) === requestedTab)) {
+		return requestedTab
+	}
+
+	return getButtonKey(props.tabButtons[0])
+}
+
+const activeTab = ref(resolveActiveTab(route.query.tab))
+
 // computed properties
 const isTeamRequest = computed(() => {
 	return props.tabButtons && activeTab.value === getButtonKey(props.tabButtons[1])
+})
+
+const isListLoading = computed(() => {
+	return documents.loading || (isTeamRequest.value && managed_employees.loading)
 })
 
 const formViewRoute = computed(() => {
@@ -273,9 +290,13 @@ const documents = createResource({
 			})
 			return doc
 		})
-		// filter out the non managed_employees from docs
-		docs = docs.filter(item => managed_employees.data.includes(item.employee))
-		 
+
+		if (isTeamRequest.value) {
+			const managedEmployeeNames = Array.isArray(managed_employees.data)
+				? managed_employees.data
+				: []
+			docs = docs.filter((item) => managedEmployeeNames.includes(item.employee))
+		}
 
 		let pagedData
 		if (!documents.params.start || documents.params.start === 0) {
@@ -354,6 +375,10 @@ function clearFilters() {
 }
 
 function fetchDocumentList(start = 0) {
+	if (isTeamRequest.value && managed_employees.loading) {
+		return
+	}
+
 	if (start === 0) {
 		hasNextPage.value = true
 	}
@@ -397,6 +422,22 @@ watch(
 	() => activeTab.value,
 	(_value) => {
 		fetchDocumentList()
+	}
+)
+
+watch(
+	() => route.query.tab,
+	(tab) => {
+		activeTab.value = resolveActiveTab(tab)
+	}
+)
+
+watch(
+	() => managed_employees.loading,
+	(loading) => {
+		if (!loading && isTeamRequest.value) {
+			fetchDocumentList()
+		}
 	}
 )
 
