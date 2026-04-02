@@ -27,6 +27,125 @@ SUPPORTED_FIELD_TYPES = [
 	"Currency",
 ]
 
+HALF_DAY_OPEN_STATUSES = {"FIRST HALF OPEN", "SECOND HALF OPEN"}
+HOLIDAY_STATUS_OVERRIDES = {
+	"FIRST HALF": "FIRST HALF HOLIDAY",
+	"SECOND HALF": "SECOND HALF HOLIDAY",
+	"FIRST HALF OPEN": "FIRST HALF HOLIDAY",
+	"SECOND HALF OPEN": "SECOND HALF HOLIDAY",
+}
+
+
+def _date_to_str(value: str | datetime.date | datetime.datetime) -> str:
+	return getdate(value).strftime("%Y-%m-%d")
+
+
+def _iter_date_range(from_date: str | datetime.date, to_date: str | datetime.date):
+	date = getdate(from_date)
+	to_date = getdate(to_date)
+
+	while date_diff(to_date, date) >= 0:
+		yield date
+		date = add_days(date, 1)
+
+
+def _normalize_half_day_session(session: str | None) -> str:
+	session = (session or "").strip().upper().replace("_", " ")
+	if "FIRST" in session:
+		return "FIRST HALF"
+	if "SECOND" in session:
+		return "SECOND HALF"
+	return session
+
+
+def build_open_leave_application_dates(
+	leave_applications, from_date: str, to_date: str
+) -> dict[str, dict[str, str]]:
+	requested_from_date = getdate(from_date)
+	requested_to_date = getdate(to_date)
+	dates = {}
+	half_day_dates = {}
+
+	for leave_application in leave_applications:
+		leave_start = max(getdate(leave_application.get("from_date")), requested_from_date)
+		leave_end = min(getdate(leave_application.get("to_date")), requested_to_date)
+
+		if leave_start > leave_end:
+			continue
+
+		half_day_date = leave_application.get("half_day_date")
+		half_day_date = getdate(half_day_date) if half_day_date else None
+		half_day_session = _normalize_half_day_session(
+			leave_application.get("custom_half_day_session")
+		)
+
+		for current_date in _iter_date_range(leave_start, leave_end):
+			date_str = _date_to_str(current_date)
+			dates.setdefault(
+				date_str,
+				{
+					"leave_application": leave_application.get("name"),
+					"leave_type": leave_application.get("leave_type"),
+				},
+			)
+
+			if (
+				leave_application.get("half_day")
+				and half_day_date
+				and current_date == half_day_date
+				and half_day_session in {"FIRST HALF", "SECOND HALF"}
+			):
+				half_day_dates.setdefault(date_str, set()).add(half_day_session)
+				continue
+
+			dates[date_str]["status"] = "On Leave"
+
+	for date_str, sessions in half_day_dates.items():
+		if dates.get(date_str, {}).get("status") == "On Leave":
+			continue
+
+		if sessions == {"FIRST HALF", "SECOND HALF"}:
+			dates[date_str]["status"] = "On Leave"
+		elif "FIRST HALF" in sessions:
+			dates[date_str]["status"] = "FIRST HALF OPEN"
+		elif "SECOND HALF" in sessions:
+			dates[date_str]["status"] = "SECOND HALF OPEN"
+
+	return {date_str: data for date_str, data in dates.items() if data.get("status")}
+
+
+def build_attendance_calendar_events(
+	holidays,
+	attendance: dict,
+	open_leave_applications: dict[str, dict[str, str]],
+	from_date: str,
+	to_date: str,
+) -> dict[str, str]:
+	holiday_dates = {_date_to_str(holiday) for holiday in holidays}
+	attendance_by_date = {_date_to_str(date): status for date, status in attendance.items()}
+	events = {}
+
+	for current_date in _iter_date_range(from_date, to_date):
+		date_str = _date_to_str(current_date)
+		open_leave_status = open_leave_applications.get(date_str, {}).get("status")
+
+		if date_str in attendance_by_date:
+			status = attendance_by_date[date_str]
+		elif open_leave_status in HALF_DAY_OPEN_STATUSES:
+			status = open_leave_status
+		elif date_str in holiday_dates:
+			status = "Holiday"
+		else:
+			status = open_leave_status
+
+		if date_str in holiday_dates:
+			status = HOLIDAY_STATUS_OVERRIDES.get(status, status)
+
+		if status:
+			events[date_str] = status
+
+	return events
+
 
 @frappe.whitelist()
 def get_current_user_info() -> dict:
@@ -123,59 +242,38 @@ def are_push_notifications_enabled() -> bool:
 def get_attendance_calendar_events(employee: str, from_date: str, to_date: str) -> dict[str, str]:
 	holidays = get_holidays_for_calendar(employee, from_date, to_date)
 	attendance = get_attendance_for_calendar(employee, from_date, to_date)
-	events = {}
 	open_leave_applications = get_open_leave_application_dates(employee, from_date, to_date)
-	open_leave_application_dates = [date for date in open_leave_applications.keys()]
-	date = getdate(from_date)
-	while date_diff(to_date, date) >= 0:
-		date_str = date.strftime("%Y-%m-%d")
-		if date in attendance:
-			events[date_str] = attendance[date]
-		elif date in holidays:
-			events[date_str] = "Holiday"
-		elif date_str in open_leave_application_dates:
-			events[date_str] = open_leave_applications[date_str]["status"]
-		date = add_days(date, 1)
-	# iterate over the dates again to append Holiday if it's a holiday
-	date = getdate(from_date)
-	strf_holidays = [date.strftime("%Y-%m-%d") for date in holidays]
-	while date_diff(to_date, date) >= 0:
-		date_str = date.strftime("%Y-%m-%d")
-		if date_str in strf_holidays:
-			if events[date_str] == "FIRST HALF":
-				events[date_str] = "FIRST HALF HOLIDAY"
-			elif events[date_str] == "SECOND HALF":
-				events[date_str] = "SECOND HALF HOLIDAY"
-			elif events[date_str] == "FIRST HALF OPEN":
-				events[date_str] = "FIRST HALF HOLIDAY"
-			elif events[date_str] == "SECOND HALF OPEN":
-				events[date_str] = "SECOND HALF HOLIDAY"
-		date = add_days(date, 1)
+	return build_attendance_calendar_events(
+		holidays, attendance, open_leave_applications, from_date, to_date
+	)
 
 
-	return events
+def get_open_leave_application_dates(
+	employee: str, from_date: str, to_date: str
+) -> dict[str, dict[str, str]]:
+	leave_applications = frappe.get_all(
+		"Leave Application",
+		{
+			"employee": employee,
+			"status": "Open",
+			"from_date": ["<=", to_date],
+			"to_date": [">=", from_date],
+		},
+		[
+			"name",
+			"leave_type",
+			"from_date",
+			"to_date",
+			"half_day",
+			"half_day_date",
+			"custom_half_day_session",
+		],
+	)
+	return build_open_leave_application_dates(leave_applications, from_date, to_date)
 
-def get_open_leave_application_dates(employee: str, from_date: str, to_date: str) -> list[str]:
-	leave_applications = frappe.get_all("Leave Application", {"employee": employee, "status": "Open", "from_date": ["<=", to_date], "to_date": [">=", from_date]}, "*")
-	dates = {}
-	for leave_application in leave_applications:
-		leave_dates = get_dates_from_date_range(leave_application.from_date, leave_application.to_date)
-		# iterate over the dates and get more info about the leave for each date
-		for date in leave_dates:
-			dates[date] = {
-				"leave_application": leave_application.name,
-				"leave_type": leave_application.leave_type,
-				"status": (leave_application.custom_half_day_session + " OPEN") if leave_application.half_day and str(leave_application.half_day_date) == date else "On Leave"
-			}
-	return dates
 
 def get_dates_from_date_range(from_date: str, to_date: str) -> list[str]:
-	dates = []
-	date = getdate(from_date)
-	while date_diff(to_date, date) >= 0:
-		dates.append(date.strftime("%Y-%m-%d"))
-		date = add_days(date, 1)
-	return dates
+	return [_date_to_str(date) for date in _iter_date_range(from_date, to_date)]
 
 
 def get_attendance_for_calendar(employee: str, from_date: str, to_date: str) -> list[dict[str, str]]:
