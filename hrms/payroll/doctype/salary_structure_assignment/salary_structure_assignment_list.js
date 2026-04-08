@@ -15,7 +15,11 @@ function register_ignored_standard_filters(listview, fieldnames) {
 }
 
 async function apply_l1_employee_filter(listview, l1_user, target_field = "employee") {
-	await listview.filter_area.remove(target_field);
+	if (listview.__tcr_employee_scope_filter_applied) {
+		await listview.filter_area.remove(target_field);
+		listview.__tcr_employee_scope_filter_applied = false;
+	}
+
 	if (!l1_user) {
 		listview.refresh();
 		return;
@@ -34,30 +38,42 @@ async function apply_l1_employee_filter(listview, l1_user, target_field = "emplo
 		"in",
 		employees.length ? employees : ["__no_employee__"]
 	);
+	listview.__tcr_employee_scope_filter_applied = true;
 }
 
-frappe.listview_settings["Leave Policy Assignment"] = {
-	onload: function (list_view) {
-		list_view.page.add_inner_button(__("Bulk Leave Policy Assignment"), function () {
-			frappe.set_route("Form", "Leave Control Panel");
-		});
+frappe.listview_settings["Salary Structure Assignment"] = {
+	onload(listview) {
+		const standard_filters_wrapper = listview.page.page_form.find(".standard-filter-section");
 
-		const standard_filters_wrapper = list_view.page.page_form.find(".standard-filter-section");
-		if (!list_view.page.fields_dict.tcr_l1_filter) {
-			list_view.page.add_field(
+		if (!listview.page.fields_dict.from_date) {
+			listview.page.add_field(
+				{
+					fieldname: "from_date",
+					label: __("From Date"),
+					fieldtype: "Date",
+					condition: "=",
+					is_filter: 1,
+					onchange: () => listview.refresh(),
+				},
+				standard_filters_wrapper
+			);
+		}
+
+		if (!listview.page.fields_dict.tcr_l1_filter) {
+			listview.page.add_field(
 				{
 					fieldname: "tcr_l1_filter",
 					label: __("L1"),
 					fieldtype: "Link",
 					options: "User",
 					onchange: function () {
-						apply_l1_employee_filter(list_view, this.get_value());
+						apply_l1_employee_filter(listview, this.get_value());
 					},
 				},
 				standard_filters_wrapper
 			);
 		}
 
-		register_ignored_standard_filters(list_view, ["tcr_l1_filter"]);
+		register_ignored_standard_filters(listview, ["tcr_l1_filter"]);
 	},
 };

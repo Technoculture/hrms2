@@ -57,15 +57,15 @@
 					v-model="activeTab"
 				/>
 
-				<div
-					class="flex flex-col bg-white rounded mt-5"
-					v-if="!documents.loading && documents.data?.length && !managed_employees.loading"
-				>
 					<div
-						class="p-3.5 items-center justify-between border-b cursor-pointer"
-						v-for="link in documents.data"
-						:key="link.name"
+						class="flex flex-col bg-white rounded mt-5"
+						v-if="!isDocumentLoading && visibleDocuments?.length"
 					>
+						<div
+							class="p-3.5 items-center justify-between border-b cursor-pointer"
+							v-for="link in visibleDocuments"
+							:key="link.name"
+						>
 						<component
 							v-if="props.doctype === 'Employee Checkin'"
 							:is="listItemComponent[doctype]"
@@ -89,16 +89,16 @@
 						</router-link>
 					</div>
 				</div>
-				<EmptyState
-					:message="__('No {0} found', [props.doctype?.toLowerCase()])"
-					v-else-if="!documents.loading"
-				/>
+					<EmptyState
+						:message="__('No {0} found', [props.doctype?.toLowerCase()])"
+						v-else-if="!isDocumentLoading"
+					/>
 
-				<!-- Loading Indicator -->
-				<div v-if="documents.loading || managed_employees.loading" class="flex mt-2 items-center justify-center">
-					<LoadingIndicator class="w-8 h-8 text-gray-800" />
+					<!-- Loading Indicator -->
+					<div v-if="isDocumentLoading" class="flex mt-2 items-center justify-center">
+						<LoadingIndicator class="w-8 h-8 text-gray-800" />
+					</div>
 				</div>
-			</div>
 		</div>
 
 		<CustomIonModal trigger="show-filter-modal">
@@ -130,7 +130,7 @@
 </template>
 
 <script setup>
-import { useRouter } from "vue-router"
+import { useRouter, useRoute } from "vue-router"
 import { inject, ref, markRaw, watch, computed, reactive, onMounted } from "vue"
 import {
 	modalController,
@@ -203,11 +203,25 @@ const listItemComponent = {
 }
 
 const router = useRouter()
+const route = useRoute()
 const dayjs = inject("$dayjs")
 const socket = inject("$socket")
 const employee = inject("$employee")
 const filterMap = reactive({})
-const activeTab = ref(props.tabButtons ? getButtonKey(props.tabButtons[0]) : undefined)
+
+const normalizeTabValue = (value) => `${value ?? ""}`.replace(/\+/g, " ").trim().toLowerCase()
+
+const resolveTabFromQuery = () => {
+	if (!props.tabButtons) return undefined
+	const requestedTab = normalizeTabValue(route.query?.tab)
+	if (!requestedTab) return undefined
+
+	return props.tabButtons
+		.map((tab) => getButtonKey(tab))
+		.find((tab) => normalizeTabValue(tab) === requestedTab)
+}
+
+const activeTab = ref(resolveTabFromQuery() || (props.tabButtons ? getButtonKey(props.tabButtons[0]) : undefined))
 const areFiltersApplied = ref(false)
 const appliedFilters = ref([])
 const workflowStateField = ref(null)
@@ -230,6 +244,10 @@ const isTeamRequest = computed(() => {
 	return props.tabButtons && activeTab.value === getButtonKey(props.tabButtons[1])
 })
 
+const isTeamLeaveRequest = computed(() => {
+	return props.doctype === "Leave Application" && isTeamRequest.value
+})
+
 const formViewRoute = computed(() => {
 	return `${props.doctype.replace(/\s+/g, "")}FormView`
 })
@@ -249,6 +267,82 @@ const defaultFilters = computed(() => {
 
 	return filters
 })
+
+const visibleDocuments = computed(() => {
+	if (isTeamLeaveRequest.value) {
+		return teamLeaveDocuments.data
+	}
+	return documents.data
+})
+
+const isDocumentLoading = computed(() => {
+	if (isTeamLeaveRequest.value) {
+		return teamLeaveDocuments.loading || managed_employees.loading
+	}
+	return documents.loading || managed_employees.loading
+})
+
+function applyLocalFilters(docs) {
+	if (!appliedFilters.value?.length) {
+		return docs
+	}
+
+	const toComparable = (value) => {
+		if (value === undefined || value === null || value === "") {
+			return null
+		}
+
+		const valueAsString = `${value}`.trim()
+		if (/^-?\d+(\.\d+)?$/.test(valueAsString)) {
+			return Number(valueAsString)
+		}
+
+		const dateValue = dayjs(value)
+		if (dateValue.isValid()) {
+			return dateValue.valueOf()
+		}
+
+		return valueAsString.toLowerCase()
+	}
+
+	return docs.filter((doc) => {
+		return appliedFilters.value.every((filter) => {
+			const [, fieldname, condition, value] = filter
+			const docValue = doc?.[fieldname]
+			if (!condition) return true
+			const normalizedCondition = `${condition}`.trim()
+
+			if (normalizedCondition === "=") {
+				return `${docValue ?? ""}` === `${value ?? ""}`
+			}
+			if (normalizedCondition === "!=") {
+				return `${docValue ?? ""}` !== `${value ?? ""}`
+			}
+			if (normalizedCondition === "Like" || normalizedCondition === "like") {
+				return `${docValue ?? ""}`.toLowerCase().includes(`${value ?? ""}`.toLowerCase())
+			}
+			if (
+				normalizedCondition === ">" ||
+				normalizedCondition === "<" ||
+				normalizedCondition === ">=" ||
+				normalizedCondition === "<="
+			) {
+				const left = toComparable(docValue)
+				const right = toComparable(value)
+				if (left === null || right === null) {
+					return false
+				}
+
+				if (normalizedCondition === ">") return left > right
+				if (normalizedCondition === "<") return left < right
+				if (normalizedCondition === ">=") return left >= right
+				if (normalizedCondition === "<=") return left <= right
+			}
+
+			return true
+		})
+	})
+}
 
 // resources
 const documents = createResource({
@@ -273,8 +367,11 @@ const documents = createResource({
 			})
 			return doc
 		})
-		// filter out the non managed_employees from docs
-		docs = docs.filter(item => managed_employees.data.includes(item.employee))
+		// Team requests must always be scoped to managed employees.
+		const managedEmployees = managed_employees.data || []
+		if (isTeamRequest.value) {
+			docs = docs.filter((item) => managedEmployees.includes(item.employee))
+		}
 		 
 
 		let pagedData
@@ -285,6 +382,27 @@ const documents = createResource({
 		}
 
 		return pagedData
+	},
+})
+
+const teamLeaveDocuments = createResource({
+	url: "hrms.api.get_leave_applications_for_approval",
+	onSuccess: (data) => {
+		const start = teamLeaveDocuments.params?.start || 0
+		if ((data?.length || 0) <= start + listOptions.value.page_length) {
+			hasNextPage.value = false
+		}
+	},
+	transform(data) {
+		const start = teamLeaveDocuments.params?.start || 0
+		const filtered = applyLocalFilters(Array.isArray(data) ? [...data] : [])
+		const end = start + listOptions.value.page_length
+		const pageSlice = filtered.slice(start, end)
+
+		if (!start) {
+			return pageSlice
+		}
+		return (teamLeaveDocuments.data || []).concat(pageSlice)
 	},
 })
 
@@ -358,13 +476,26 @@ function fetchDocumentList(start = 0) {
 		hasNextPage.value = true
 	}
 
+	if (isTeamLeaveRequest.value) {
+		teamLeaveDocuments.submit({
+			employee: employee.data.name,
+			approver_id: employee.data.user_id,
+			for_approval: 1,
+			limit: 500,
+			start: start || 0,
+		})
+		return
+	}
+
 	const filters = [[props.doctype, "docstatus", "!=", "2"]]
 	filters.push(...defaultFilters.value)
 
 	if (appliedFilters.value) filters.push(...appliedFilters.value)
 
 	if (workflowStateField.value) {
-		listOptions.value.fields.push(workflowStateField.value)
+		if (!listOptions.value.fields.includes(workflowStateField.value)) {
+			listOptions.value.fields.push(workflowStateField.value)
+		}
 	}
 
 	documents.submit({
@@ -381,7 +512,8 @@ const handleScroll = debounce(() => {
 	const scrollPercentage = (scrollTop / (scrollHeight - clientHeight)) * 100
 
 	if (scrollPercentage >= 90) {
-		const start = documents.params.start + listOptions.value.page_length
+		const params = isTeamLeaveRequest.value ? teamLeaveDocuments.params : documents.params
+		const start = (params?.start || 0) + listOptions.value.page_length
 		fetchDocumentList(start)
 	}
 }, 500)
@@ -397,6 +529,25 @@ watch(
 	() => activeTab.value,
 	(_value) => {
 		fetchDocumentList()
+	}
+)
+
+watch(
+	() => managed_employees.loading,
+	(isLoading, wasLoading) => {
+		if (wasLoading && !isLoading && isTeamRequest.value) {
+			fetchDocumentList()
+		}
+	}
+)
+
+watch(
+	() => route.query?.tab,
+	() => {
+		const queryTab = resolveTabFromQuery()
+		if (queryTab && queryTab !== activeTab.value) {
+			activeTab.value = queryTab
+		}
 	}
 )
 
