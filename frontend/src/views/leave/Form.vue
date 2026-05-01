@@ -137,6 +137,8 @@ watch(
 	() => leaveApplication.value.leave_approver,
   	(newApprover) => {
 			const approverField = formFields.data.find(f => f.fieldname === "leave_approver")
+			if (!approverField?.documentList) return
+
 			const selected = approverField?.documentList?.find(opt => opt.value === newApprover)
 			leaveApplication.value.leave_approver_name = selected?.label?.split(" : ")[1] || ""
   }
@@ -154,6 +156,9 @@ function getFilteredFields(fields) {
 		// "leave_approver",
 		// "leave_approver_name",
 		// "section_break_7"
+		"l1_manager",
+		"custom_l1_manager",
+		"custom_reporting_manager_l1",
 	]
 
 	const employeeFields = [
@@ -168,7 +173,11 @@ function getFilteredFields(fields) {
 
 	if (!props.id) excludeFields.push(...employeeFields)
 
-	return fields.filter((field) => !excludeFields.includes(field.fieldname))
+	return fields.filter(
+		(field) =>
+			!excludeFields.includes(field.fieldname) &&
+			field.label?.trim().toLowerCase() !== "l1 manager"
+	)
 }
 
 function setFormReadOnly() {
@@ -267,6 +276,12 @@ function setLeaveApprovers(data) {
 	const leave_approver = formFields.data?.find(
 		(field) => field.fieldname === "leave_approver"
 	)
+	if (!leave_approver) {
+		leaveApplication.value.leave_approver = data?.leave_approver
+		leaveApplication.value.leave_approver_name = data?.leave_approver_name
+		return
+	}
+
 	leave_approver.reqd = data?.is_mandatory
 	leave_approver.documentList = data?.department_approvers.map((approver) => ({
 		label: approver.full_name

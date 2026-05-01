@@ -18,6 +18,7 @@
 					</div>
 
 					<Autocomplete
+						v-if="payrollPeriods.data?.length"
 						:label="__('Payroll Period')"
 						class="w-full"
 						:placeholder="__('Select Payroll Period')"
@@ -90,7 +91,7 @@ const payrollPeriods = createListResource({
 		})
 	},
 	onSuccess: (data) => {
-		selectedPeriod.value = data[0]
+		selectedPeriod.value = data?.[0] || null
 	},
 })
 
@@ -107,9 +108,14 @@ const documents = createListResource({
 	],
 	filters: {
 		employee: employee.data?.name,
-		docstatus: 1,
+		docstatus: ["!=", 2],
 	},
+	orFilters: [
+		["Salary Slip", "docstatus", "=", 1],
+		["Salary Slip", "custom_last_sent", "is", "set"],
+	],
 	orderBy: "end_date desc",
+	auto: true,
 })
 
 const lastSalarySlip = computed(() => documents.data?.[0])
@@ -124,10 +130,14 @@ watch(
 	() => selectedPeriod.value,
 	(value) => {
 		let period = periodsByName.value[value?.value]
-		documents.filters.start_date = [
-			"between",
-			[period?.start_date, period?.end_date],
-		]
+		if (period?.start_date && period?.end_date) {
+			documents.filters.start_date = [
+				"between",
+				[period.start_date, period.end_date],
+			]
+		} else {
+			delete documents.filters.start_date
+		}
 		documents.reload()
 	}
 )
