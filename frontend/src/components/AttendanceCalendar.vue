@@ -1,6 +1,6 @@
 <template>
 	<div class="flex flex-col w-full gap-5" v-if="calendarEvents.data">
-		<div class="text-lg text-gray-800 font-bold">{{ __("Attendance Calendar") }}</div>
+		<div class="text-lg text-gray-800 font-bold">{{ __("My Attendance") }}</div>
 
 		<div class="flex flex-col gap-6 bg-white py-6 px-3.5 rounded-lg border-none">
 			<!-- Month Change -->
@@ -31,10 +31,68 @@
 				<div v-for="_ in firstOfMonth.get('d')" />
 				<div v-for="index in firstOfMonth.endOf('M').get('D')">
 					<div
-						class="h-8 w-8 flex rounded-full mx-auto"
-						:class="getEventOnDate(index) && colorMap[getEventOnDate(index)]"
+						class="h-8 w-8 flex rounded-full mx-auto relative"
+						:class="{
+							[colorMap[getEventOnDate(index)]]: getEventOnDate(index) && getEventOnDate(index) !== 'First Half' && getEventOnDate(index) !== 'Second Half',
+						}"
 					>
-						<span class="text-gray-800 text-sm font-medium m-auto">
+						<div 
+							v-if="getEventOnDate(index) === 'FIRST HALF'" 
+							class="absolute inset-0 rounded-full overflow-hidden"
+						>
+							<div class="h-full w-1/2 bg-yellow-200 absolute left-0"></div>
+							<div class="h-full w-1/2 bg-green-300 absolute right-0"></div>
+						</div>
+						<div 
+							v-if="getEventOnDate(index) === 'FIRST HALF HOLIDAY'" 
+							class="absolute inset-0 rounded-full overflow-hidden"
+						>
+							<div class="h-full w-1/2 bg-gray-300 absolute left-0"></div>
+							<div class="h-full w-1/2 bg-green-300 absolute right-0"></div>
+						</div>
+						<div 
+							v-if="getEventOnDate(index) === 'SECOND HALF HOLIDAY'" 
+							class="absolute inset-0 rounded-full overflow-hidden"
+						>
+							<div class="h-full w-1/2 bg-green-300 absolute left-0"></div>
+							<div class="h-full w-1/2 bg-gray-300 absolute right-0"></div>
+						</div>
+						<div 
+							v-if="getEventOnDate(index) === 'SECOND HALF ABSENT'" 
+							class="absolute inset-0 rounded-full overflow-hidden"
+						>
+							<div class="h-full w-1/2 bg-red-200 absolute left-0"></div>
+							<div class="h-full w-1/2 bg-yellow-200 absolute right-0"></div>
+						</div>
+						<div 
+							v-if="getEventOnDate(index) === 'FIRST HALF ABSENT'" 
+							class="absolute inset-0 rounded-full overflow-hidden"
+						>
+							<div class="h-full w-1/2 bg-yellow-200 absolute left-0"></div>
+							<div class="h-full w-1/2 bg-red-200 absolute right-0"></div>
+						</div>
+						<div 
+							v-if="getEventOnDate(index) === 'SECOND HALF'" 
+							class="absolute inset-0 rounded-full overflow-hidden"
+						>
+							<div class="h-full w-1/2 bg-green-300 absolute left-0"></div>
+							<div class="h-full w-1/2 bg-yellow-200 absolute right-0"></div>
+						</div>
+						<div 
+							v-if="getEventOnDate(index) === 'SECOND HALF OPEN'" 
+							class="absolute inset-0 rounded-full overflow-hidden"
+						>
+							<div class="h-full w-1/2 bg-white-200 absolute left-0"></div>
+							<div class="h-full w-1/2 bg-yellow-200 absolute right-0"></div>
+						</div>
+						<div 
+							v-if="getEventOnDate(index) === 'FIRST HALF OPEN'" 
+							class="absolute inset-0 rounded-full overflow-hidden"
+						>
+							<div class="h-full w-1/2 bg-yellow-200 absolute left-0"></div>
+							<div class="h-full w-1/2 bg-white-200 absolute right-0"></div>
+						</div>
+						<span class="text-gray-800 text-sm font-medium m-auto z-10">
 							{{ index }}
 						</span>
 					</div>
@@ -47,8 +105,16 @@
 			<div class="grid grid-cols-4 mx-2">
 				<div v-for="status in summaryStatuses" class="flex flex-col gap-1">
 					<div class="flex flex-row gap-1 items-center">
-						<span class="rounded full h-3 w-3" :class="colorMap[status]" />
-						<span class="text-gray-600 text-sm font-medium leading-5"> {{ __(status) }} </span>
+						<span v-if="status !== 'First Half' && status !== 'Second Half'" class="rounded-full h-3 w-3" :class="colorMap[status]" />
+						<div v-if="status === 'First Half'" class="relative rounded-full h-3 w-3 overflow-hidden">
+							<div class="absolute inset-0 bg-red-200"></div>
+							<div class="absolute inset-0 w-1/2 h-full bg-yellow-200 left-0"></div>
+						</div>
+						<div v-if="status === 'Second Half'" class="relative rounded-full h-3 w-3 overflow-hidden">
+							<div class="absolute inset-0 bg-yellow-200"></div>
+							<div class="absolute inset-0 w-1/2 h-full bg-red-200 right-0"></div>
+						</div>
+						<span class="text-gray-600 text-sm font-medium leading-5"> {{ __(status === "On Leave" ? "Leave" : status) }} </span>
 					</div>
 					<span class="text-gray-800 text-base font-semibold leading-6 mx-auto">
 						{{ summary[status] || 0 }}
@@ -72,24 +138,84 @@ const colorMap = {
 	Present: "bg-green-300",
 	"Work From Home": "bg-green-300",
 	"Half Day": "bg-yellow-200",
+	"First Half": "bg-yellow-200",
+	"Second Half": "bg-yellow-200",
 	Absent: "bg-red-200",
 	"On Leave": "bg-blue-300",
 	Holiday: "bg-gray-300",
 }
 
 // __("Present"), __("Half Day"), __("Absent"), __("On Leave"), __("Work From Home")
-const summaryStatuses = ["Present", "Half Day", "Absent", "On Leave"]
+const summaryStatuses = ["Present", "Absent", "On Leave", "Half Day"]
+// combinations for half day present-leave, leave-present, absent-leave, leave-absent
 
 const summary = computed(() => {
 	const summary = {}
+	console.log("calendarEvents.data", Object.values(calendarEvents.data))
 
 	for (const status of Object.values(calendarEvents.data)) {
 		let updatedStatus = status === "Work From Home" ? "Present" : status
 		if (updatedStatus in summary) {
 			summary[updatedStatus] += 1
 		} else {
-			summary[updatedStatus] = 1
+			if (updatedStatus !== "FIRST HALF" && updatedStatus !== "SECOND HALF" && updatedStatus !== "FIRST HALF OPEN" && updatedStatus !== "SECOND HALF OPEN") {
+				summary[updatedStatus] = 1
+			}
 		}
+		if (updatedStatus === "FIRST HALF" || updatedStatus === "SECOND HALF") {
+			if ("Half Day" in summary) {
+				summary["Half Day"] += 1
+			} else {
+				summary["Half Day"] = 1
+			}
+			if ("Present" in summary) {
+				summary["Present"] += 0.5
+			} else {
+				summary["Present"] = 0.5
+			}
+			if ("On Leave" in summary) {
+				summary["On Leave"] += 0.5
+			} else {
+				summary["On Leave"] = 0.5
+			}
+		}
+		if (updatedStatus === "FIRST HALF HOLIDAY" || updatedStatus === "SECOND HALF HOLIDAY") {
+			if ("Present" in summary) {
+				summary["Present"] += 0.5
+			} else {
+				summary["Present"] = 0.5
+			}
+		}
+		if (updatedStatus === "FIRST HALF OPEN" || updatedStatus === "SECOND HALF OPEN") {
+			if ("On Leave" in summary) {
+				summary["On Leave"] += 0.5
+			} else {
+				summary["On Leave"] = 0.5
+			}
+			if ("Half Day" in summary) {
+				summary["Half Day"] += 1
+			} else {
+				summary["Half Day"] = 1
+			}
+		}
+		if (updatedStatus === "FIRST HALF ABSENT" || updatedStatus === "SECOND HALF ABSENT") {
+			if ("On Leave" in summary) {
+				summary["On Leave"] += 0.5
+			} else {
+				summary["On Leave"] = 0.5
+			}
+			if ("Half Day" in summary) {
+				summary["Half Day"] += 1
+			} else {
+				summary["Half Day"] = 1
+			}
+			if ("Absent" in summary) {
+				summary["Absent"] += 0.5
+			} else {
+				summary["Absent"] = 0.5
+			}
+		}
+
 	}
 
 	return summary

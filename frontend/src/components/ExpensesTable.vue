@@ -1,7 +1,7 @@
 <template>
 	<!-- Header -->
 	<div class="flex flex-row justify-between items-center mt-2">
-		<h2 class="text-base font-semibold text-gray-800">{{ __("Expenses") }} </h2>
+		<h2 class="text-base font-semibold text-gray-800">{{ __("Expenses") }}</h2>
 		<div class="flex flex-row gap-3 items-center">
 			<span class="text-base font-semibold text-gray-800">
 				{{ formatCurrency(expenseClaim.total_claimed_amount, currency) }}
@@ -66,9 +66,7 @@
 	<CustomIonModal :isOpen="isModalOpen" @didDismiss="resetSelectedItem()">
 		<template #actionSheet>
 			<!-- Add Expense Action Sheet -->
-			<div
-				class="bg-white w-full flex flex-col items-center justify-center pb-5"
-			>
+			<div class="bg-white w-full flex flex-col items-center justify-center pb-5">
 				<div class="w-full pt-8 pb-5 border-b text-center">
 					<span class="text-gray-900 font-bold text-lg">
 						{{ modalTitle }}
@@ -92,10 +90,7 @@
 						/>
 					</div>
 
-					<div
-						v-if="!isReadOnly"
-						class="flex w-full flex-row items-center justify-between gap-3"
-					>
+					<div v-if="!isReadOnly" class="flex w-full flex-row items-center justify-between gap-3">
 						<Button
 							v-if="editingIdx !== null"
 							class="border-red-600 text-red-600 py-5 text-sm"
@@ -115,10 +110,7 @@
 							:disabled="addButtonDisabled"
 						>
 							<template #prefix>
-								<FeatherIcon
-									:name="editingIdx === null ? 'plus' : 'check'"
-									class="w-4"
-								/>
+								<FeatherIcon :name="editingIdx === null ? 'plus' : 'check'" class="w-4" />
 							</template>
 							{{ editingIdx === null ? __("Add Expense") : __("Update Expense") }}
 						</Button>
@@ -154,11 +146,7 @@ const props = defineProps({
 		default: false,
 	},
 })
-const emit = defineEmits([
-	"add-expense-item",
-	"update-expense-item",
-	"delete-expense-item",
-])
+const emit = defineEmits(["add-expense-item", "update-expense-item", "delete-expense-item"])
 const dayjs = inject("$dayjs")
 const __ = inject("$translate")
 const expenseItem = ref({})
@@ -201,7 +189,14 @@ const expensesTableFields = createResource({
 	url: "hrms.api.get_doctype_fields",
 	params: { doctype: "Expense Claim Detail" },
 	transform(data) {
-		const excludeFields = ["description_sb", "amounts_sb"]
+		const excludeFields = [
+			"description_sb",
+			"amounts_sb",
+			"accounting_dimensions_section",
+			"cost_center",
+			"dimension_col_break",
+			"project",
+		]
 		return data.filter((field) => !excludeFields.includes(field.fieldname))
 	},
 })

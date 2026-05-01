@@ -31,37 +31,51 @@ import LeaveIcon from "@/components/icons/LeaveIcon.vue"
 import ExpenseIcon from "@/components/icons/ExpenseIcon.vue"
 import SalaryIcon from "@/components/icons/SalaryIcon.vue"
 import AttendanceIcon from "@/components/icons/AttendanceIcon.vue"
-import { inject } from "vue"
+import { computed, inject } from "vue"
 
 const __ = inject("$translate")
+const employee = inject("$employee")
 
 const route = useRoute()
 
-const tabItems = [
-	{
-		icon: HomeIcon,
-		title: __("Home"),
-		route: "/home",
-	},
-	{
-		icon: AttendanceIcon,
-		title: __("Attendance"),
-		route: "/dashboard/attendance",
-	},
-	{
-		icon: LeaveIcon,
-		title: __("Leaves"),
-		route: "/dashboard/leaves",
-	},
-	{
-		icon: ExpenseIcon,
-		title: __("Expenses"),
-		route: "/dashboard/expense-claims",
-	},
-	{
-		icon: SalaryIcon,
-		title: __("Salary"),
-		route: "/dashboard/salary-slips",
-	},
-]
+const canViewSalarySlips = computed(
+	() =>
+		Boolean(employee.data?.custom_show_salary_slips) &&
+		Boolean(employee.data?.custom_show_salary_slips_after)
+)
+
+const tabItems = computed(() => {
+	const items = [
+		{
+			icon: HomeIcon,
+			title: __("Home"),
+			route: "/home",
+		},
+		{
+			icon: AttendanceIcon,
+			title: __("Attendance"),
+			route: "/dashboard/attendance",
+		},
+		{
+			icon: LeaveIcon,
+			title: __("Leaves"),
+			route: "/dashboard/leaves",
+		},
+		{
+			icon: ExpenseIcon,
+			title: __("Expenses"),
+			route: "/dashboard/expense-claims",
+		},
+	]
+
+	if (canViewSalarySlips.value) {
+		items.push({
+			icon: SalaryIcon,
+			title: __("Salary"),
+			route: "/dashboard/salary-slips",
+		})
+	}
+
+	return items
+})
 </script>

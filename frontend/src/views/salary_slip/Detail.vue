@@ -2,7 +2,7 @@
 	<ion-page>
 		<ion-content :fullscreen="true">
 			<FormView
-				v-if="formFields.data"
+				v-if="formFields.data && salarySlipAccess.data === true"
 				doctype="Salary Slip"
 				v-model="salarySlip"
 				:fields="formFields.data"
@@ -40,18 +40,23 @@
 					</Button>
 				</template>
 			</FormView>
+			<EmptyState
+				v-else-if="salarySlipAccess.data === false"
+				:message="__('Salary slip is not available')"
+			/>
 		</ion-content>
 	</ion-page>
 </template>
 
 <script setup>
-import { ref, watch } from "vue"
+import { inject, ref, watch } from "vue"
 import { IonPage, IonContent } from "@ionic/vue"
 
 import { createResource, ErrorMessage } from "frappe-ui"
 
 import FormView from "@/components/FormView.vue"
 import SalaryDetailTable from "@/components/SalaryDetailTable.vue"
+import EmptyState from "@/components/EmptyState.vue"
 
 import { getCompanyCurrency } from "@/data/currencies"
 
@@ -64,9 +69,16 @@ const props = defineProps({
 
 const downloadError = ref("")
 const loading = ref(false)
+const __ = inject("$translate")
 
 // reactive object to store form data
 const salarySlip = ref({})
+
+const salarySlipAccess = createResource({
+	url: "hrms.api.can_access_salary_slip",
+	params: { name: props.id },
+})
+salarySlipAccess.reload()
 
 // get form fields
 const formFields = createResource({

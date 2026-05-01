@@ -59,7 +59,7 @@
 
 				<div
 					class="flex flex-col bg-white rounded mt-5"
-					v-if="!documents.loading && documents.data?.length"
+					v-if="!isListLoading && documents.data?.length"
 				>
 					<div
 						class="p-3.5 items-center justify-between border-b cursor-pointer"
@@ -91,11 +91,11 @@
 				</div>
 				<EmptyState
 					:message="__('No {0} found', [props.doctype?.toLowerCase()])"
-					v-else-if="!documents.loading"
+					v-else-if="!isListLoading"
 				/>
 
 				<!-- Loading Indicator -->
-				<div v-if="documents.loading" class="flex mt-2 items-center justify-center">
+				<div v-if="isListLoading" class="flex mt-2 items-center justify-center">
 					<LoadingIndicator class="w-8 h-8 text-gray-800" />
 				</div>
 			</div>
@@ -130,7 +130,7 @@
 </template>
 
 <script setup>
-import { useRouter } from "vue-router"
+import { useRoute, useRouter } from "vue-router"
 import { inject, ref, markRaw, watch, computed, reactive, onMounted } from "vue"
 import {
 	modalController,
@@ -151,6 +151,7 @@ import ShiftAssignmentItem from "@/components/ShiftAssignmentItem.vue"
 import LeaveRequestItem from "@/components/LeaveRequestItem.vue"
 import ExpenseClaimItem from "@/components/ExpenseClaimItem.vue"
 import EmployeeAdvanceItem from "@/components/EmployeeAdvanceItem.vue"
+import SundayHolidayWorkingRequestItem from "@/components/SundayHolidayWorkingRequestItem.vue"
 import ListFiltersActionSheet from "@/components/ListFiltersActionSheet.vue"
 import CustomIonModal from "@/components/CustomIonModal.vue"
 import RequestActionSheet from "@/components/RequestActionSheet.vue"
@@ -158,6 +159,7 @@ import { EMPLOYEE_CHECKIN_FIELDS } from "@/data/config/requestSummaryFields"
 
 import useWorkflow from "@/composables/workflow"
 import { useListUpdate } from "@/composables/realtime"
+import { managed_employees } from "@/data/leaves"
 
 const __ = inject("$translate")
 const props = defineProps({
@@ -197,14 +199,15 @@ const listItemComponent = {
 	"Leave Application": markRaw(LeaveRequestItem),
 	"Expense Claim": markRaw(ExpenseClaimItem),
 	"Employee Advance": markRaw(EmployeeAdvanceItem),
+	"Sunday Holiday Working Request": markRaw(SundayHolidayWorkingRequestItem),
 }
 
 const router = useRouter()
+const route = useRoute()
 const dayjs = inject("$dayjs")
 const socket = inject("$socket")
 const employee = inject("$employee")
 const filterMap = reactive({})
-const activeTab = ref(props.tabButtons ? getButtonKey(props.tabButtons[0]) : undefined)
 const areFiltersApplied = ref(false)
 const appliedFilters = ref([])
 const workflowStateField = ref(null)
@@ -222,9 +225,26 @@ const listOptions = ref({
 	page_length: 50,
 })
 
+const resolveActiveTab = (tab) => {
+	if (!props.tabButtons?.length) return undefined
+
+	const requestedTab = typeof tab === "string" ? tab : null
+	if (requestedTab && props.tabButtons.some((button) => getButtonKey(button) === requestedTab)) {
+		return requestedTab
+	}
+
+	return getButtonKey(props.tabButtons[0])
+}
+
+const activeTab = ref(resolveActiveTab(route.query.tab))
+
 // computed properties
 const isTeamRequest = computed(() => {
 	return props.tabButtons && activeTab.value === getButtonKey(props.tabButtons[1])
+})
+
+const isListLoading = computed(() => {
+	return documents.loading || (isTeamRequest.value && managed_employees.loading)
 })
 
 const formViewRoute = computed(() => {
@@ -263,13 +283,20 @@ const documents = createResource({
 		// convert keys and values arrays to docs object
 		const fields = data["keys"]
 		const values = data["values"]
-		const docs = values.map((value) => {
+		let docs = values.map((value) => {
 			const doc = {}
 			fields.forEach((field, index) => {
 				doc[field] = value[index]
 			})
 			return doc
 		})
+
+		if (isTeamRequest.value) {
+			const managedEmployeeNames = Array.isArray(managed_employees.data)
+				? managed_employees.data
+				: []
+			docs = docs.filter((item) => managedEmployeeNames.includes(item.employee))
+		}
 
 		let pagedData
 		if (!documents.params.start || documents.params.start === 0) {
@@ -348,6 +375,10 @@ function clearFilters() {
 }
 
 function fetchDocumentList(start = 0) {
+	if (isTeamRequest.value && managed_employees.loading) {
+		return
+	}
+
 	if (start === 0) {
 		hasNextPage.value = true
 	}
@@ -391,6 +422,22 @@ watch(
 	() => activeTab.value,
 	(_value) => {
 		fetchDocumentList()
+	}
+)
+
+watch(
+	() => route.query.tab,
+	(tab) => {
+		activeTab.value = resolveActiveTab(tab)
+	}
+)
+
+watch(
+	() => managed_employees.loading,
+	(loading) => {
+		if (!loading && isTeamRequest.value) {
+			fetchDocumentList()
+		}
 	}
 )
 

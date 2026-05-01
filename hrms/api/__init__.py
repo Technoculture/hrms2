@@ -3,9 +3,10 @@ from frappe import _
 from frappe.model import get_permitted_fields
 from frappe.model.workflow import get_workflow_name
 from frappe.query_builder import Order
-from frappe.utils import add_days, date_diff, getdate, strip_html
-
+from frappe.utils import add_days, date_diff, getdate, strip_html, get_time, time_diff_in_hours
+import datetime
 from erpnext.setup.doctype.employee.employee import get_holiday_list_for_employee
+from tcr_erp.utils.half_day_quota_utils import get_employee_quota
 
 SUPPORTED_FIELD_TYPES = [
 	"Link",
@@ -26,6 +27,125 @@ SUPPORTED_FIELD_TYPES = [
 	"Currency",
 ]
 
+HALF_DAY_OPEN_STATUSES = {"FIRST HALF OPEN", "SECOND HALF OPEN"}
+HOLIDAY_STATUS_OVERRIDES = {
+	"FIRST HALF": "FIRST HALF HOLIDAY",
+	"SECOND HALF": "SECOND HALF HOLIDAY",
+	"FIRST HALF OPEN": "FIRST HALF HOLIDAY",
+	"SECOND HALF OPEN": "SECOND HALF HOLIDAY",
+}
+
+
+def _date_to_str(value: str | datetime.date | datetime.datetime) -> str:
+	return getdate(value).strftime("%Y-%m-%d")
+
+
+def _iter_date_range(from_date: str | datetime.date, to_date: str | datetime.date):
+	date = getdate(from_date)
+	to_date = getdate(to_date)
+
+	while date_diff(to_date, date) >= 0:
+		yield date
+		date = add_days(date, 1)
+
+
+def _normalize_half_day_session(session: str | None) -> str:
+	session = (session or "").strip().upper().replace("_", " ")
+	if "FIRST" in session:
+		return "FIRST HALF"
+	if "SECOND" in session:
+		return "SECOND HALF"
+	return session
+
+
+def build_open_leave_application_dates(
+	leave_applications, from_date: str, to_date: str
+) -> dict[str, dict[str, str]]:
+	requested_from_date = getdate(from_date)
+	requested_to_date = getdate(to_date)
+	dates = {}
+	half_day_dates = {}
+
+	for leave_application in leave_applications:
+		leave_start = max(getdate(leave_application.get("from_date")), requested_from_date)
+		leave_end = min(getdate(leave_application.get("to_date")), requested_to_date)
+
+		if leave_start > leave_end:
+			continue
+
+		half_day_date = leave_application.get("half_day_date")
+		half_day_date = getdate(half_day_date) if half_day_date else None
+		half_day_session = _normalize_half_day_session(
+			leave_application.get("custom_half_day_session")
+		)
+
+		for current_date in _iter_date_range(leave_start, leave_end):
+			date_str = _date_to_str(current_date)
+			dates.setdefault(
+				date_str,
+				{
+					"leave_application": leave_application.get("name"),
+					"leave_type": leave_application.get("leave_type"),
+				},
+			)
+
+			if (
+				leave_application.get("half_day")
+				and half_day_date
+				and current_date == half_day_date
+				and half_day_session in {"FIRST HALF", "SECOND HALF"}
+			):
+				half_day_dates.setdefault(date_str, set()).add(half_day_session)
+				continue
+
+			dates[date_str]["status"] = "On Leave"
+
+	for date_str, sessions in half_day_dates.items():
+		if dates.get(date_str, {}).get("status") == "On Leave":
+			continue
+
+		if sessions == {"FIRST HALF", "SECOND HALF"}:
+			dates[date_str]["status"] = "On Leave"
+		elif "FIRST HALF" in sessions:
+			dates[date_str]["status"] = "FIRST HALF OPEN"
+		elif "SECOND HALF" in sessions:
+			dates[date_str]["status"] = "SECOND HALF OPEN"
+
+	return {date_str: data for date_str, data in dates.items() if data.get("status")}
+
+
+def build_attendance_calendar_events(
+	holidays,
+	attendance: dict,
+	open_leave_applications: dict[str, dict[str, str]],
+	from_date: str,
+	to_date: str,
+) -> dict[str, str]:
+	holiday_dates = {_date_to_str(holiday) for holiday in holidays}
+	attendance_by_date = {_date_to_str(date): status for date, status in attendance.items()}
+	events = {}
+
+	for current_date in _iter_date_range(from_date, to_date):
+		date_str = _date_to_str(current_date)
+		open_leave_status = open_leave_applications.get(date_str, {}).get("status")
+
+		if date_str in attendance_by_date:
+			status = attendance_by_date[date_str]
+		elif open_leave_status in HALF_DAY_OPEN_STATUSES:
+			status = open_leave_status
+		elif date_str in holiday_dates:
+			status = "Holiday"
+		else:
+			status = open_leave_status
+
+		if date_str in holiday_dates:
+			status = HOLIDAY_STATUS_OVERRIDES.get(status, status)
+
+		if status:
+			events[date_str] = status
+
+	return events
+
 
 @frappe.whitelist()
 def get_current_user_info() -> dict:
@@ -41,22 +161,79 @@ def get_current_user_info() -> dict:
 @frappe.whitelist()
 def get_current_employee_info() -> dict:
 	current_user = frappe.session.user
+	employee_fields = [
+		"name",
+		"first_name",
+		"employee_name",
+		"designation",
+		"department",
+		"company",
+		"reports_to",
+		"user_id",
+	]
+	employee_meta = frappe.get_meta("Employee")
+	if employee_meta.has_field("custom_show_salary_slips"):
+		employee_fields.append("custom_show_salary_slips")
+	if employee_meta.has_field("custom_show_salary_slips_after"):
+		employee_fields.append("custom_show_salary_slips_after")
+
 	employee = frappe.db.get_value(
 		"Employee",
 		{"user_id": current_user, "status": "Active"},
-		[
-			"name",
-			"first_name",
-			"employee_name",
-			"designation",
-			"department",
-			"company",
-			"reports_to",
-			"user_id",
-		],
+		employee_fields,
 		as_dict=True,
 	)
 	return employee
+
+
+def _get_salary_slip_access_settings() -> dict:
+	current_user = frappe.session.user
+	employee_meta = frappe.get_meta("Employee")
+
+	if not (
+		employee_meta.has_field("custom_show_salary_slips")
+		and employee_meta.has_field("custom_show_salary_slips_after")
+	):
+		return {}
+
+	return frappe.db.get_value(
+		"Employee",
+		{"user_id": current_user, "status": "Active"},
+		["name", "custom_show_salary_slips", "custom_show_salary_slips_after"],
+		as_dict=True,
+	) or {}
+
+
+def _can_access_salary_slip(name: str) -> bool:
+	employee = _get_salary_slip_access_settings()
+	if not (
+		employee
+		and employee.custom_show_salary_slips
+		and employee.custom_show_salary_slips_after
+	):
+		return False
+
+	salary_slip = frappe.db.get_value(
+		"Salary Slip",
+		name,
+		["employee", "posting_date", "docstatus", "custom_last_sent"],
+		as_dict=True,
+	)
+	if not salary_slip:
+		return False
+
+	return (
+		salary_slip.employee == employee.name
+		and salary_slip.docstatus != 2
+		and (salary_slip.docstatus == 1 or salary_slip.custom_last_sent)
+		and getdate(salary_slip.posting_date)
+		> getdate(employee.custom_show_salary_slips_after)
+	)
+
+
+@frappe.whitelist()
+def can_access_salary_slip(name: str) -> bool:
+	return _can_access_salary_slip(name)
 
 
 @frappe.whitelist()
@@ -122,27 +299,120 @@ def are_push_notifications_enabled() -> bool:
 def get_attendance_calendar_events(employee: str, from_date: str, to_date: str) -> dict[str, str]:
 	holidays = get_holidays_for_calendar(employee, from_date, to_date)
 	attendance = get_attendance_for_calendar(employee, from_date, to_date)
-	events = {}
+	open_leave_applications = get_open_leave_application_dates(employee, from_date, to_date)
+	return build_attendance_calendar_events(
+		holidays, attendance, open_leave_applications, from_date, to_date
+	)
 
-	date = getdate(from_date)
-	while date_diff(to_date, date) >= 0:
-		date_str = date.strftime("%Y-%m-%d")
-		if date in attendance:
-			events[date_str] = attendance[date]
-		elif date in holidays:
-			events[date_str] = "Holiday"
-		date = add_days(date, 1)
 
-	return events
+def get_open_leave_application_dates(
+	employee: str, from_date: str, to_date: str
+) -> dict[str, dict[str, str]]:
+	leave_applications = frappe.get_all(
+		"Leave Application",
+		{
+			"employee": employee,
+			"status": "Open",
+			"from_date": ["<=", to_date],
+			"to_date": [">=", from_date],
+		},
+		[
+			"name",
+			"leave_type",
+			"from_date",
+			"to_date",
+			"half_day",
+			"half_day_date",
+			"custom_half_day_session",
+		],
+	)
+	return build_open_leave_application_dates(leave_applications, from_date, to_date)
+
+
+def get_dates_from_date_range(from_date: str, to_date: str) -> list[str]:
+	return [_date_to_str(date) for date in _iter_date_range(from_date, to_date)]
 
 
 def get_attendance_for_calendar(employee: str, from_date: str, to_date: str) -> list[dict[str, str]]:
 	attendance = frappe.get_all(
 		"Attendance",
-		{"employee": employee, "attendance_date": ["between", [from_date, to_date]]},
-		["attendance_date", "status"],
+		{"employee": employee, "docstatus": 1, "attendance_date": ["between", [from_date, to_date]]},
+		["attendance_date", "status", "shift", "in_time", "out_time", "leave_application", "employee"],
 	)
+	# if status is half day, then check if it's first half or second half
+	for d in attendance:
+			d = get_attendance_for_date(d)
 	return {d["attendance_date"]: d["status"] for d in attendance}
+
+def get_attendance_for_date(d: any):
+
+	# # check if the attendance is absent and still there is a leave application
+	status_for_other_half = None
+	if d["status"] == "Absent":
+		leave_application = frappe.db.exists("Leave Application", {"employee": d["employee"], "from_date": ["<=", d["attendance_date"]], "to_date": [">=", d["attendance_date"]], "status": ["in", ["Approved", "Open"]], "docstatus": ["in", [0, 1]]})
+		if leave_application:
+			is_half_day = frappe.db.get_value("Leave Application", leave_application, "half_day") and frappe.db.get_value("Leave Application", leave_application, "half_day_date") == d["attendance_date"]
+			if is_half_day:
+				d["status"] = "Half Day"
+				d["leave_application"] = leave_application
+				status_for_other_half = "ABSENT"
+			else:
+				d["status"] = "On Leave"
+	# check if the attendance is half day
+	if d["status"] == "Half Day":
+		# if there is any leave_application
+		leave_application = d.get("leave_application")
+		if leave_application:
+			# get the leave application
+			leave_session = frappe.db.get_value("Leave Application", leave_application, "custom_half_day_session")
+			if leave_session == "FIRST HALF":
+				d["status"] = "FIRST HALF"
+				if status_for_other_half:
+					d["status"] += " " + status_for_other_half
+			elif leave_session == "SECOND HALF":
+				d["status"] = "SECOND HALF"
+				if status_for_other_half:
+					d["status"] += " " + status_for_other_half
+			return d
+		# get the start time and end time of the shift
+		shift = d.get("shift")
+		if shift:
+			shift = frappe.get_doc("Shift Type", d["shift"])
+			start_time = shift.start_time
+			end_time = shift.end_time
+			in_time = get_time(d["in_time"])
+			out_time = get_time(d["out_time"])
+
+			# Convert timedelta to time if necessary
+			if isinstance(start_time, datetime.timedelta):
+				start_time = (datetime.datetime.min + start_time).time()
+			if isinstance(end_time, datetime.timedelta):
+				end_time = (datetime.datetime.min + end_time).time()
+			# Calculate mid_day_time (center of shift)
+			start_seconds = start_time.hour * 3600 + start_time.minute * 60 + start_time.second
+			end_seconds = end_time.hour * 3600 + end_time.minute * 60 + end_time.second
+			mid_seconds = (start_seconds + end_seconds) / 2
+			mid_day_time = datetime.time(int(mid_seconds // 3600), int((mid_seconds % 3600) // 60), int(mid_seconds % 60))
+
+			def time_diff_in_seconds(t1, t2):
+				return abs((datetime.datetime.combine(datetime.date.today(), t2) - datetime.datetime.combine(datetime.date.today(), t1)).total_seconds())
+
+			# Calculate durations in first and second half
+			first_half_start = max(in_time, start_time)
+			first_half_end = min(out_time, mid_day_time)
+			first_half_duration = max(0, time_diff_in_seconds(first_half_start, first_half_end))
+
+			second_half_start = max(in_time, mid_day_time)
+			second_half_end = min(out_time, end_time)
+			second_half_duration = max(0, time_diff_in_seconds(second_half_start, second_half_end))
+			# Determine which half was less worked
+			if first_half_duration >= second_half_duration:
+				d["status"] = "SECOND HALF"
+			else:
+				d["status"] = "FIRST HALF"
+		else:
+			d["status"] = "SECOND HALF"
+	return d
 
 
 def get_holidays_for_calendar(employee: str, from_date: str, to_date: str) -> list[str]:
@@ -363,6 +633,85 @@ def get_leave_applications(
 
 	return applications
 
+@frappe.whitelist()
+def get_managed_employees(
+	employee: str,
+	approver_id: str | None = None,
+) -> list[str]:
+	"""
+	Return the employee names (primary keys)
+	"""
+	managed_employees = frappe.db.sql("""
+		SELECT DISTINCT e.name, e.employee_name, e.holiday_list
+		FROM `tabEmployee` e
+		INNER JOIN `tabDepartment Approver` ela ON ela.parent = e.name
+		WHERE ela.approver = %s AND e.status = 'Active'
+	""", (approver_id,), as_dict=True)
+	return [employee.name for employee in managed_employees]
+
+
+
+@frappe.whitelist()
+def get_leave_applications_for_approval(
+	employee: str,
+	approver_id: str | None = None,
+	for_approval: bool = False,
+	limit: int | None = None,
+) -> list[dict]:
+	"""
+	Get leave applications of the employees for which given employees is one of the approvers (based on custom_leave_approvers field in employee doctype)
+	Args:
+		employee: str
+		approver_id: str
+		for_approval: bool
+		limit: int | None
+	Returns:
+		list[dict]: List of leave applications
+	"""	
+	managed_employees = frappe.db.sql("""
+		SELECT DISTINCT e.name, e.employee_name, e.holiday_list
+		FROM `tabEmployee` e
+		INNER JOIN `tabDepartment Approver` ela ON ela.parent = e.name
+		WHERE ela.approver = %s AND e.status = 'Active'
+	""", (approver_id,), as_dict=True)
+	filters = get_filters("Leave Application", employee, None, for_approval)
+	fields = [
+		"name",
+		"posting_date",
+		"employee",
+		"employee_name",
+		"leave_type",
+		"status",
+		"from_date",
+		"to_date",
+		"half_day",
+		"half_day_date",
+		"description",
+		"total_leave_days",
+		"leave_balance",
+		"leave_approver",
+		"posting_date",
+		"creation",
+	]
+	filters["employee"] = ("in", [employee.name for employee in managed_employees])
+
+	if workflow_state_field := get_workflow_state_field("Leave Application"):
+		fields.append(workflow_state_field)
+
+	applications = frappe.get_list(
+		"Leave Application",
+		fields=fields,
+		filters=filters,
+		order_by="posting_date desc",
+		limit=limit,
+	)
+
+	if workflow_state_field:
+		for application in applications:
+			application["workflow_state_field"] = workflow_state_field
+
+	return applications
+
 
 @frappe.whitelist()
 def get_leave_balance_map(employee: str) -> dict[str, dict[str, float]]:
@@ -380,14 +729,69 @@ def get_leave_balance_map(employee: str) -> dict[str, dict[str, float]]:
 
 	leave_details = get_leave_details(employee, date)
 	allocation = leave_details["leave_allocation"]
+	company = frappe.db.get_value("Employee", employee, "company")
+	leave_period = frappe.get_doc("Leave Period", {"company": company, "is_active": 1})
 
 	for leave_type, details in allocation.items():
+		leave_applications = frappe.db.get_all("Leave Application", {"employee": employee, "status": ["in", ["Approved", "Open"]], "leave_type": leave_type, "from_date": ["<=", leave_period.to_date], "to_date": [">=", leave_period.from_date]}, ["total_leave_days", "leave_type"])
+		# Calculate total leave days consumed
+		total_leave_days = sum(application.total_leave_days for application in leave_applications)
 		leave_map[leave_type] = {
 			"allocated_leaves": details.get("total_leaves"),
-			"balance_leaves": details.get("remaining_leaves"),
+			"balance_leaves": details.get("total_leaves") - total_leave_days,
 		}
 
 	return leave_map
+
+@frappe.whitelist()
+def get_my_lwp_consumption(employee: str) -> dict:
+	from hrms.hr.doctype.leave_application.leave_application import get_leave_details
+
+	date = getdate()
+	# Retrieve active leave period for the company of employee
+	company = frappe.db.get_value("Employee", employee, "company")
+	leave_period = frappe.get_doc("Leave Period", {"company": company, "is_active": 1})
+
+	if not leave_period:
+		return {}
+
+	# get max_allowed_lwp
+	lwps = frappe.get_list("Leave Type", filters={"is_lwp": 1}, pluck="name")
+
+	leave_map = {}
+
+	if not lwps:
+		leave_map['Leave Without Pay'] =  {
+			"allocated_leaves": 0,
+			"balance_leaves": total_leave_days,
+		}
+
+	# Get leave application for the leave period
+	leave_applications = frappe.db.get_all("Leave Application", {"employee": employee, "status": ["in", ["Approved", "Open"]], "leave_type": ["in", lwps], "from_date": ["<=", leave_period.to_date], "to_date": [">=", leave_period.from_date]}, ["total_leave_days", "leave_type"])
+
+	# Calculate total leave days consumed
+	total_leave_days = sum(application.total_leave_days for application in leave_applications)
+
+	max_allowed_lwps = frappe.get_value("Leave Type", lwps[0], "max_leaves_allowed")
+
+	leave_map[lwps[0]] = {
+			"allocated_leaves": max_allowed_lwps,
+			"balance_leaves": max_allowed_lwps - total_leave_days,
+		}
+	return leave_map
+
+@frappe.whitelist()	
+def get_half_day_quota(employee: str, date: str) -> dict:	
+	data = get_employee_quota(employee, date)
+	if not data:
+		return None
+	return {
+		"Half Day Quota": {
+			"allocated_leaves": data.allocated_half_days,
+			"balance_leaves": data.balance_half_days,
+			"used_leaves": data.used_half_days,
+		}
+	}
 
 
 @frappe.whitelist()
@@ -409,6 +813,133 @@ def get_holidays_for_employee(employee: str) -> list[dict]:
 
 	return holidays
 
+@frappe.whitelist()
+def get_today_holidays_for_employee(employee: str) -> dict:
+	"""
+	Get holiday data for today - returns different structure for employees vs managers
+	Args:
+		employee (str): Employee ID
+	Returns:
+		dict: Holiday data with has_holidays_today, is_manager flags and holiday_lists
+	"""
+	current_user = frappe.db.get_value("Employee", employee, "user_id")
+	today = getdate()
+	
+	# Check if current employee is a manager by finding employees who have them as leave approver
+	managed_employees = frappe.db.sql("""
+		SELECT DISTINCT e.name, e.employee_name, e.holiday_list
+		FROM `tabEmployee` e
+		INNER JOIN `tabDepartment Approver` ela ON ela.parent = e.name
+		WHERE ela.approver = %s AND e.status = 'Active'
+	""", (current_user,), as_dict=True)	
+	
+	is_manager = len(managed_employees) > 0
+	holiday_lists_data = []
+	
+	if is_manager:
+		# For managers - get distinct holiday lists from managed employees
+		holiday_lists = {}
+		
+		for emp in managed_employees:
+			emp_holiday_list = emp.holiday_list or get_holiday_list_for_employee(emp.name, raise_exception=False)
+			if emp_holiday_list:
+				if emp_holiday_list not in holiday_lists:
+					holiday_lists[emp_holiday_list] = {
+						'employees': [],
+						'holiday_list_name': emp_holiday_list
+					}
+				holiday_lists[emp_holiday_list]['employees'].append(emp)
+		
+		# Get today's holidays for each holiday list
+		for holiday_list_name, data in holiday_lists.items():
+			today_holidays = frappe.db.get_all(
+				"Holiday",
+				filters={
+					"parent": holiday_list_name,
+					"holiday_date": today,
+					"weekly_off": 0
+				},
+				fields=["name", "holiday_date", "description"]
+			)
+			
+			if today_holidays:
+				employees_in_list = data['employees']
+				holiday_lists_data.append({
+					"holiday_list_name": holiday_list_name,
+					"holidays": [{
+						"name": today_holidays[0].name,
+						"holiday_date": today_holidays[0].holiday_date,
+						"description": strip_html(today_holidays[0].description or "").strip(),
+						"holiday_list": holiday_list_name
+					}],
+					"employees_count": len(employees_in_list),
+					"sample_employees": [emp.employee_name for emp in employees_in_list]
+				})
+		# merge the data if the holiday date is same and make the holiday list name as Multiples
+		holiday_lists_data = merge_holiday_lists_data(holiday_lists_data)[0]["holiday_lists"] if len(holiday_lists_data) > 0 else []
+	else:
+		# For regular employees - get their own holiday list
+		employee_holiday_list = get_holiday_list_for_employee(employee, raise_exception=False)
+		if employee_holiday_list:
+			today_holidays = frappe.db.get_all(
+				"Holiday",
+				filters={
+					"parent": employee_holiday_list,
+					"holiday_date": today,
+					"weekly_off": 0
+				},
+				fields=["name", "holiday_date", "description"]
+			)
+			
+			if today_holidays:
+				holiday_lists_data.append({
+					"holiday_list_name": employee_holiday_list,
+					"holidays": [{
+						"name": today_holidays[0].name,
+						"holiday_date": today_holidays[0].holiday_date,
+						"description": strip_html(today_holidays[0].description or "").strip(),
+						# "holiday_list": holiday_list_name
+					}]
+				})
+	
+	return {
+		"has_holidays_today": len(holiday_lists_data) > 0,
+		"is_manager": is_manager,
+		"holiday_lists": holiday_lists_data
+	}
+
+def merge_holiday_lists_data(holiday_lists_data: list[dict]) -> list[dict]:
+	merged_data = []
+	holiday_list_map = {}
+	for holiday_list in holiday_lists_data:
+		if holiday_list["holidays"][0]["holiday_date"] in holiday_list_map:
+			holiday_list_map[holiday_list["holidays"][0]["holiday_date"]] = [{					
+				"holiday_list_name": "Multiple Holiday Lists",
+				"holidays": [{
+					"name": holiday_list["holidays"][0]["name"],
+					"holiday_date": holiday_list["holidays"][0]["holiday_date"],
+					"description": holiday_list["holidays"][0]["description"],
+					"holiday_list": holiday_list["holiday_list_name"],
+				}],
+				"employees_count": holiday_list_map[holiday_list["holidays"][0]["holiday_date"]][0]["employees_count"] + holiday_list["employees_count"],
+				"sample_employees": holiday_list_map[holiday_list["holidays"][0]["holiday_date"]][0]["sample_employees"] + holiday_list["sample_employees"]
+			}]
+		else:
+			holiday_list_map[holiday_list["holidays"][0]["holiday_date"]] = [{					
+				"holiday_list_name": holiday_list["holiday_list_name"],
+				"holidays": [{
+					"name": holiday_list["holidays"][0]["name"],
+					"holiday_date": holiday_list["holidays"][0]["holiday_date"],
+					"description": holiday_list["holidays"][0]["description"],
+					"holiday_list": holiday_list["holiday_list_name"],
+				}],
+				"employees_count": holiday_list["employees_count"],
+				"sample_employees": holiday_list["sample_employees"]
+			}]
+	
+	for holiday_date, holiday_lists in holiday_list_map.items():
+		merged_data.append({"holiday_date": holiday_date, "holiday_lists": holiday_lists})
+	return merged_data
 
 @frappe.whitelist()
 def get_leave_approval_details(employee: str) -> dict:
@@ -757,6 +1288,9 @@ def download_salary_slip(name: str):
 
 	from frappe.utils.print_format import download_pdf
 
+	if not _can_access_salary_slip(name):
+		frappe.throw(_("Not permitted to access this Salary Slip"), frappe.PermissionError)
+
 	default_print_format = frappe.get_meta("Salary Slip").default_print_format or "Standard"
 
 	try:
@@ -804,3 +1338,494 @@ def get_allowed_states_for_workflow(workflow: dict, user_id: str) -> list[str]:
 @frappe.whitelist()
 def get_permitted_fields_for_write(doctype: str) -> list[str]:
 	return get_permitted_fields(doctype, permission_type="write")
+
+@frappe.whitelist()	
+def get_attendance_history(employee: str, month: str) -> list[dict]:
+	"""
+	Get detailed attendance history for an employee for a specific month.
+	Gathers data from Employee Checkin, Attendance, Shift Assignment, Shift Type,
+	and Attendance Regularization doctypes.
+	
+	Args:
+		employee (str): Employee ID
+		month (str): Month in YYYY-MM format
+		
+	Returns:
+		list[dict]: List of attendance records with detailed information
+	"""
+	import frappe
+	from frappe.utils import getdate, get_first_day, get_last_day, add_days, format_time, time_diff_in_hours, format_datetime
+	from datetime import datetime, timedelta
+	import calendar
+
+	# Parse month and get date range
+	try:
+		year, month_num = map(int, month.split('-'))
+		start_date = get_first_day(getdate(f"{year}-{month_num:02d}-01"))
+		end_date = get_last_day(getdate(f"{year}-{month_num:02d}-01"))
+		# if year and month is the current month and year, then restrict end_date to today
+		if year == getdate().year and month_num == getdate().month:
+			end_date = getdate()
+	except (ValueError, TypeError):
+		frappe.throw("Invalid month format. Use YYYY-MM format.")
+	
+	attendance_history = []
+	holidays = get_holidays(employee, start_date, end_date)
+	
+	# Iterate through each day of the month
+	current_date = start_date
+	while current_date <= end_date:
+		date_str = current_date.strftime('%Y-%m-%d')
+		
+		# Get attendance record for this date
+		attendance = frappe.db.get_value(
+			"Attendance",
+			{
+				"employee": employee,
+				"attendance_date": current_date,
+				"docstatus": 1
+			},
+			[
+				"status", "working_hours", "late_entry", "early_exit", 
+				"in_time", "out_time", "shift", "leave_type"
+			],
+			as_dict=True
+		)
+		
+		# Get shift assignment for this date using SQL query
+		shift_assignment = frappe.db.sql("""
+			SELECT shift_type, start_date, end_date
+			FROM `tabShift Assignment`
+			WHERE employee = %s 
+				AND start_date <= %s 
+				AND (end_date >= %s OR end_date IS NULL)
+				AND docstatus = 1 
+			ORDER BY start_date DESC
+			LIMIT 1
+		""", (employee, current_date, current_date), as_dict=True)
+		
+		shift_assignment = shift_assignment[0] if shift_assignment else None
+		
+		# Get shift type details
+		shift_type = None
+		shift_start_time = None
+		shift_end_time = None
+		shift_name = None
+		
+		if shift_assignment:
+			shift_type_doc = frappe.db.get_value(
+				"Shift Type",
+				shift_assignment.shift_type,
+				["name", "start_time", "end_time"],
+				as_dict=True
+			)
+			if shift_type_doc:
+				shift_type = shift_type_doc
+				shift_name = shift_type_doc.name
+				shift_start_time = format_time(shift_type_doc.start_time, format_string="hh:mm") if shift_type_doc.start_time else None
+				shift_end_time = format_time(shift_type_doc.end_time, format_string="HH:mm") if shift_type_doc.end_time else None
+		# Get employee checkins for this date
+		checkins = frappe.get_all(
+			"Employee Checkin",
+			filters={
+				"employee": employee,
+				"time": ["between", [f"{date_str} 00:00:00", f"{date_str} 23:59:59"]]
+			},
+			fields=["log_type", "time", "device_id"],
+			order_by="time asc"
+		)
+		
+		# Process time logs and calculate clock in/out times
+		time_logs = []
+		clock_in_time = None
+		unformatted_clock_in_time = None
+		unformatted_clock_out_time = None
+		clock_out_time = None
+		clock_out_missing = False
+		swipe_missing_in = False
+		swipe_missing_out = False
+		
+		for checkin in checkins:
+			time_logs.append({
+				"log_type": checkin.log_type,
+				"time": format_datetime(checkin.time, format_string="hh:mm a"),
+				"missing": False
+			})
+			
+			if checkin.log_type == "IN" and not clock_in_time:
+				clock_in_time = format_datetime(checkin.time, format_string="hh:mm:ss")
+				unformatted_clock_in_time = format_datetime(checkin.time, format_string="HH:mm:ss")
+			elif checkin.log_type == "OUT":
+				clock_out_time = format_datetime(checkin.time, format_string="hh:mm:ss")
+				unformatted_clock_out_time = format_datetime(checkin.time, format_string="HH:mm:ss")
+		
+		# Check for missing swipes
+		if attendance and attendance.status == "Present":
+			if not clock_in_time:
+				swipe_missing_in = True
+			if not clock_out_time:
+				swipe_missing_out = True
+				clock_out_missing = True
+				time_logs.append({
+					"log_type": "OUT",
+					"time": "OUT missing",
+					"missing": True
+				})
+		
+		# Calculate late entry and early exit
+		late_entry = False
+		late_minutes = 0
+		early_exit = False
+		
+		if attendance:
+			# late_entry = attendance.late_entry or False
+			early_exit = attendance.early_exit or False
+			
+			if clock_in_time and shift_start_time: # TODO: handle this crap in a better way
+				try:
+					# Convert shift_start_time from string to time object if needed
+					if isinstance(shift_start_time, str):
+						# Try different time formats since '10:00' doesn't match '%H:%M:%S'
+						try:
+							shift_start_time = datetime.strptime(shift_start_time, "%H:%M").time()
+						except ValueError:
+							try:
+								shift_start_time = datetime.strptime(shift_start_time, "%I:%M %p").time()
+							except ValueError:
+								shift_start_time = datetime.strptime(shift_start_time, "%H:%M:%S").time()
+					
+					shift_start_datetime = datetime.combine(current_date, shift_start_time)
+					
+					# Convert clock_in_time to datetime object
+					try:
+						# Try parsing with the format used in format_datetime above
+						clock_in_datetime = datetime.strptime(f"{date_str} {unformatted_clock_in_time}", "%Y-%m-%d %H:%M:%S")
+					except ValueError:
+						# If that fails, try alternative format
+						clock_in_datetime = datetime.strptime(f"{date_str} {unformatted_clock_in_time}", "%Y-%m-%d %I:%M:%S %p")
+					# if date_str == "2025-07-24":
+					if clock_in_datetime > shift_start_datetime:
+						late_minutes = int((clock_in_datetime - shift_start_datetime).total_seconds() / 60)
+					# if late_minutes is greater than 15, then set late_entry to True
+					if late_minutes > 0:
+						late_entry = True
+					else:
+						late_entry = False
+				except (ValueError, TypeError) as e:
+					print("Error calculating late minutes:", e)
+					late_minutes = 0
+		
+		# Calculate working hours
+		effective_hours = "0h 0m"
+		gross_hours = "0h 0m"
+		effective_hours = convert_hours_to_string(get_effective_hours(checkins))
+		gross_hours = convert_hours_to_string(get_gross_hours(checkins))
+		
+		if attendance and attendance.working_hours:
+			hours = int(attendance.working_hours)
+			minutes = int((attendance.working_hours - hours) * 60)
+			effective_hours = f"{hours}h {minutes}m"
+			gross_hours = get_gross_hours(checkins)
+			# format gross_hours to hh:mm
+			gross_hours = convert_hours_to_string(gross_hours)
+		
+		# Determine penalties
+		penalties = [] # TODO: add penalties implementations
+		
+		# Check for attendance regularization pending
+		attendance_adjustment_pending = frappe.db.exists(
+			"Attendance Regularization",
+			{
+				"employee": employee,
+				"date": current_date,
+				"docstatus": 0  # Draft status indicates pending
+			}
+		)
+		attendance_adjustment_approved = frappe.db.exists(
+			"Attendance Regularization",
+			{
+				"employee": employee,
+				"date": current_date,
+				"docstatus": 1  # Approved status indicates approved
+			}
+		)
+
+		
+		# Determine status
+		status = "Absent"  # Default
+		if attendance:
+			if attendance.status == "On Leave":
+				status = "Leave"
+			elif attendance.status == "Half Day":
+				status = "Half Day"
+			elif attendance.status == "Present":
+				status = "Present"
+			elif attendance.status == "Work From Home":
+				status = "Work From Home"
+			else:
+				status = attendance.status
+		else:
+			if holidays: # a dict of str:dict
+				if date_str in holidays.keys():
+					# find holiday with date_str in holidays
+					holiday = holidays[date_str]
+					if holiday["is_weekly_off"]:
+						status = "Week Off"
+					else:
+						status = "Holiday"
+		# if attendance.status if half day, then get the half day session from the leave application and manually calculate the gross and effective hours
+		half_day_session = None
+		if attendance and attendance.status == "Half Day":
+			if_leave_application = frappe.db.exists(
+				"Leave Application",
+				{
+					"employee": employee,
+					"from_date": ["<=", current_date],
+					"to_date": [">=", current_date],
+					"status": ["in", ["Approved", "Open"]],
+					"half_day": 1,
+					"half_day_date": current_date,
+					"docstatus": 1
+				}
+			)
+			if if_leave_application:
+				leave_application = frappe.get_doc("Leave Application", if_leave_application)
+				if leave_application.status == "Approved":
+					status = "Half Day"
+					half_day_session = leave_application.custom_half_day_session
+					gross_hours = convert_hours_to_string(get_gross_hours(checkins))
+					effective_hours = convert_hours_to_string(get_effective_hours(checkins))
+		# for higher priority of leaves (attendance may or may not be present), then get the leave application and check if the leave is approved
+		if_leave_application = frappe.db.exists(
+			"Leave Application",
+			{
+				"employee": employee,
+				"from_date": ["<=", current_date],
+				"to_date": [">=", current_date],
+				"status": ["in", ["Approved", "Open"]],
+				# "half_day": 1,
+				# "half_day_date": current_date,
+				"docstatus": ["in", [0, 1]]
+			}
+		)
+		if if_leave_application:
+			leave_application = frappe.get_doc("Leave Application", if_leave_application)
+			if leave_application.status in ["Approved", "Open"]:
+				if leave_application.half_day and leave_application.half_day_date == current_date:
+					status = "Half Day"
+					half_day_session = leave_application.custom_half_day_session
+					gross_hours = convert_hours_to_string(get_gross_hours(checkins))
+					effective_hours = convert_hours_to_string(get_effective_hours(checkins))
+				else:
+					status = "Leave"
+					# leave_type = leave_application.leave_type
+					# leave_days = leave_application.total_leave_days
+					# leave_days_without_holidays = leave_application.total_leave_days_without_holidays
+					# leave_days_with_holidays = leave_application.total_leave_days_with_holidays
+
+		# Build the attendance record
+		attendance_record = {
+			"date": date_str,
+			"status": status,
+			"half_day_session": half_day_session,
+			"shift_name": shift_name,
+			"shift_start_time": format_time(shift_start_time,format_string="hh:mm a"),
+			"shift_end_time": format_time(shift_end_time,format_string="hh:mm a"),
+			"clock_in_time": format_time(unformatted_clock_in_time,format_string="hh:mm a") if unformatted_clock_in_time else unformatted_clock_in_time or clock_in_time,
+			"clock_out_time": format_time(unformatted_clock_out_time,format_string="hh:mm a") if unformatted_clock_out_time else unformatted_clock_out_time or clock_out_time,
+			"clock_out_missing": clock_out_missing,
+			"late_entry": late_entry,
+			"late_minutes": late_minutes,
+			"early_exit": early_exit,
+			"effective_hours": effective_hours,
+			"gross_hours": gross_hours,
+			"penalties": penalties,
+			"attendance_adjustment_pending": bool(attendance_adjustment_pending),
+			"attendance_adjusted": bool(attendance_adjustment_approved),
+			"swipe_missing_in": swipe_missing_in,
+			"swipe_missing_out": swipe_missing_out,
+			"time_logs": time_logs
+		}
+		
+		attendance_history.append(attendance_record)
+		current_date = add_days(current_date, 1)
+	
+	return attendance_history
+
+def convert_hours_to_string(hours: float | None) -> str:
+	"""
+	Convert hours to string
+	hours: float or None
+	"""
+	if hours is None:
+		return "0h 0m"
+	hours_fixed = int(hours)
+	minutes_fixed = int((hours - hours_fixed) * 60)
+	return f"{hours_fixed}h {minutes_fixed}m"
+
+@frappe.whitelist()
+def get_gross_hours(checkins: list) -> float:
+	"""
+	Get gross and effective hours from checkins
+	gross_hours = total time from first IN to last OUT
+	"""
+	total_hours = 0
+	first_in_time = None
+	last_out_time = None
+	for checkin in checkins:
+		if checkin.log_type == "IN":
+			if not first_in_time:
+				first_in_time = checkin.time
+	for checkin in checkins[::-1]:
+		if checkin.log_type == "OUT":
+			if not last_out_time:
+				last_out_time = checkin.time
+	if first_in_time and last_out_time:
+		total_hours = time_diff_in_hours(last_out_time, first_in_time)
+	return total_hours
+
+def get_effective_hours(checkins: list) -> float:
+	"""
+	Get effective hours from checkins
+	effective_hours = sum of the pairs of IN and OUT
+	"""
+	effective_hours = 0
+	for i in range(0, len(checkins)-1, 2):
+		if checkins[i].log_type == "IN" and checkins[i+1].log_type == "OUT":
+			effective_hours += time_diff_in_hours(checkins[i+1].time, checkins[i].time)
+		else:
+			effective_hours += time_diff_in_hours(checkins[i+1].time, checkins[i].time)
+	
+	return effective_hours
+
+def get_holidays(employee: str,start_date: str, end_date: str) -> dict[str, dict]:
+	"""
+	Get holidays for an employee between start_date and end_date
+	Args:
+		employee (str): Employee ID
+		shift_type (str): Shift type ID
+		start_date (str): Start date in YYYY-MM-DD format
+		end_date (str): End date in YYYY-MM-DD format
+	Returns:
+		list[dict]: List of holidays with date and description, is_weekly_off, is_holiday
+	"""
+	holiday_list = {}
+	shift_assignment = frappe.db.sql("""
+		SELECT shift_type, start_date, end_date
+		FROM `tabShift Assignment`
+		WHERE employee = %s 
+			AND start_date <= %s 
+			AND (end_date >= %s OR end_date IS NULL)
+			AND docstatus = 1 
+		ORDER BY start_date DESC
+		LIMIT 1
+	""", (employee, start_date, end_date), as_dict=True)
+	shift_assignment = shift_assignment[0] if shift_assignment else None
+	if shift_assignment:
+		shift_type_doc = frappe.db.get_value(
+			"Shift Type",
+			shift_assignment.shift_type,
+			["name", "start_time", "end_time"],
+			as_dict=True
+		)
+		holiday_list = frappe.db.get_value("Shift Type", shift_type_doc.name, "holiday_list")
+	
+	if not holiday_list:
+		holiday_list = frappe.db.get_value("Employee", employee, "holiday_list")
+	holidays = frappe.get_all("Holiday", filters={"parent": holiday_list, "holiday_date": ("between", [start_date, end_date])}, fields=["holiday_date", "description", "weekly_off"])
+	holidays = {holiday.holiday_date.strftime("%Y-%m-%d"): {"description": holiday.description, "is_weekly_off": holiday.weekly_off} for holiday in holidays}
+	return holidays
+
+@frappe.whitelist()
+def get_employee_checkin_records(employee: str, date: str) -> list[dict]:
+	"""
+	Get employee checkin records for a specific date
+	Args:
+		employee (str): Employee ID
+		date (str): Date in YYYY-MM-DD format
+	Returns:
+		list[dict]: List of checkin records with log_type, time, device_id
+	"""
+	from frappe.utils import getdate, format_datetime
+	date_str = getdate(date).strftime("%Y-%m-%d")
+	# get employee checkin records for the date
+	checkins = frappe.get_all(
+		"Employee Checkin",
+		filters={
+			"employee": employee,
+			"time": ["between", [f"{date_str} 00:00:00", f"{date_str} 23:59:59"]]
+		},
+		fields=["log_type", "time", "device_id"],
+		order_by="time asc"
+	)
+	checkins = [
+		{
+			"log_type": checkin.log_type,
+			"time": format_datetime(checkin.time, format_string="hh:mm:ss"),
+			"timestamp": checkin.time
+		}
+		for checkin in checkins
+	]
+
+	return checkins
+
+
+
+
+@frappe.whitelist()
+def get_attendance_regularization_requests(employee: str, filters: dict) -> list[dict]:
+	"""
+	Get attendance regularization requests for an employee
+	Args:
+		employee (str): Employee ID
+		filters (dict): Filters for the attendance regularization requests (approver or employee)
+	Returns:
+		list[dict]: List of attendance regularization requests
+	"""
+	usable_filters = {}
+	if filters.get("employee"):
+		usable_filters["employee"] = filters["employee"]
+	# when approver is provided, then get the employees under the approver
+	if filters.get("approver"):
+		managed_employees = frappe.db.sql("""
+			SELECT DISTINCT e.name, e.employee_name, e.holiday_list
+			FROM `tabEmployee` e
+			INNER JOIN `tabDepartment Approver` ela ON ela.parent = e.name
+			WHERE ela.approver = %s AND e.status = 'Active'
+		""", (filters["approver"],), as_dict=True)
+		employee_list = [e["name"] for e in managed_employees]
+		usable_filters["employee"] = ["in", employee_list]
+	attendance_regularization_requests = frappe.get_all(
+		"Attendance Regularization",
+		filters=usable_filters,
+		fields="*",
+		limit=200
+	)
+	return attendance_regularization_requests
+
+@frappe.whitelist()
+def get_sunday_holiday_working_requests_for_approver(approver: str) -> list[dict]:
+	"""
+	Get Sunday/Holiday Working Request documents for employees managed by the given approver (employee).
+	Args:
+		employee (str): Employee ID of the approver
+	Returns:
+		list[dict]: List of Sunday/Holiday Working Request documents for managed employees
+	"""
+	# Find employees managed by this approver
+	managed_employees = frappe.db.sql("""
+		SELECT DISTINCT e.name
+		FROM `tabEmployee` e
+		INNER JOIN `tabDepartment Approver` ela ON ela.parent = e.name
+		WHERE ela.approver = %s AND e.status = 'Active'
+	""", (approver,), as_dict=True)
+	employee_list = [e["name"] for e in managed_employees]
+	if not employee_list:
+		return []
+	sunday_holiday_requests = frappe.get_all(
+		"Sunday Holiday Working Request",
+		filters={"employee": ["in", employee_list]},
+		fields="*",
+		limit=200
+	)
+	return sunday_holiday_requests

@@ -7,6 +7,7 @@
 				// mark field as mandatory
 				props.reqd ? `after:content-['_*'] after:text-red-600` : ``,
 				`block text-sm leading-5 text-gray-700`,
+				props.fieldname === 'leave_approver_name' || props.fieldname === 'leave_approver' ? 'hidden' : ''
 			]"
 		>
 			{{ props.label }}
@@ -15,7 +16,7 @@
 		<!-- Select or Link field with predefined options -->
 		<Autocomplete
 			v-if="props.fieldtype === 'Select' || props.documentList"
-			:class="isReadOnly ? 'pointer-events-none' : ''"
+			:class="[isReadOnly ? 'pointer-events-none' : '', props.fieldname === 'leave_approver' ? 'hidden' : '']"
 			:placeholder="__('Select {0}', [props.label])"
 			:options="selectionList"
 			:modelValue="modelValue"
@@ -27,6 +28,7 @@
 		<!-- Link field -->
 		<Link
 			v-else-if="props.fieldtype === 'Link'"
+			:class="props.fieldname === 'leave_approver' ? 'hidden' : ''"
 			:doctype="props.options"
 			:modelValue="modelValue"
 			:filters="props.linkFilters"
@@ -64,6 +66,7 @@
 		<Input
 			v-else-if="props.fieldtype === 'Data'"
 			type="text"
+			:class="props.fieldname === 'leave_approver_name' ? 'hidden' : ''"
 			:value="modelValue"
 			@input="(v) => emit('update:modelValue', v)"
 			@change="(v) => emit('change', v)"
@@ -96,7 +99,10 @@
 		<!-- Section Break -->
 		<div
 			v-else-if="props.fieldtype === 'Section Break'"
-			:class="props.addSectionPadding ? 'mt-2' : ''"
+			:class="[
+				props.addSectionPadding ? 'mt-2' : '',
+				props.fieldname === 'section_break_7' ? 'hidden' : ''
+			]"
 		>
 			<h2
 				v-if="props.label"

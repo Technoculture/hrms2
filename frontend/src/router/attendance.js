@@ -52,6 +52,27 @@ const routes = [
 		path: "/employee-checkins",
 		component: () => import("@/views/attendance/EmployeeCheckinList.vue"),
 	},
+	{
+		name: "AttendanceHistoryView",
+		path: "/attendance-history",
+		component: () => import("@/views/attendance/AttendanceHistory.vue"),
+	},
+	{
+		name: "AttendanceRegularizationFormView",
+		path: "/attendance-regularization/new",
+		component: () => import("@/views/attendance/AttendanceRegularizationForm.vue"),
+	},
+	{
+		name: "AttendanceRegularizationDetailView",
+		path: "/attendance-regularization/:id",
+		props: true,
+		component: () => import("@/views/attendance/AttendanceRegularizationForm.vue"),
+	},
+	{
+		name: "AttendanceRegularizationHistoryView",
+		path: "/attendance-regularization-history",
+		component: () => import("@/views/attendance/AttendanceRegularizationHistory.vue"),
+	},
 ]
 
 export default routes

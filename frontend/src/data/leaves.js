@@ -24,7 +24,7 @@ export const myLeaves = createResource({
 	url: "hrms.api.get_leave_applications",
 	params: {
 		employee: employeeResource.data.name,
-		limit: 10,
+		limit: 5,
 	},
 	auto: true,
 	cache: "hrms:my_leaves",
@@ -35,14 +35,13 @@ export const myLeaves = createResource({
 		leaveBalance.reload()
 	},
 })
-
 export const teamLeaves = createResource({
-	url: "hrms.api.get_leave_applications",
+	url: "hrms.api.get_leave_applications_for_approval",
 	params: {
 		employee: employeeResource.data.name,
 		approver_id: employeeResource.data.user_id,
 		for_approval: 1,
-		limit: 10,
+		limit: 5,
 	},
 	auto: true,
 	cache: "hrms:team_leaves",
@@ -50,6 +49,34 @@ export const teamLeaves = createResource({
 		return transformLeaveData(data)
 	},
 })
+
+export const managed_employees = createResource({
+	url: "hrms.api.get_managed_employees",
+	params: {
+		employee: employeeResource.data.name,
+		approver_id: employeeResource.data.user_id,		
+	},
+	auto: true,
+	cache: "hrms:managed_employees",
+	transform(data) {
+		return data
+	},
+})
+
+// export const teamLeaves = createResource({
+// 	url: "hrms.api.get_leave_applications",
+// 	params: {
+// 		employee: employeeResource.data.name,
+// 		approver_id: employeeResource.data.user_id,
+// 		for_approval: 1,
+// 		limit: 5,
+// 	},
+// 	auto: true,
+// 	cache: "hrms:team_leaves",
+// 	transform(data) {
+// 		return transformLeaveData(data)
+// 	},
+// })
 
 export const leaveBalance = createResource({
 	url: "hrms.api.get_leave_balance_map",
@@ -69,3 +96,57 @@ export const leaveBalance = createResource({
 		)
 	},
 })
+
+export const myLWBalance = createResource({
+	url: "hrms.api.get_my_lwp_consumption",
+	params: {
+		employee: employeeResource.data.name,
+	},
+	auto: true,
+	cache: "hrms:my_lwp_balance",
+	transform: (data) => {
+		return Object.fromEntries(
+			Object.entries(data).map(([leave_type, allocation]) => {
+				allocation.balance_percentage =
+					(allocation.balance_leaves / allocation.allocated_leaves) * 100
+				return [leave_type, allocation]
+			})
+		)
+	},
+})
+
+export const halfDayQuota = createResource({
+	url: "hrms.api.get_half_day_quota",
+	params: {
+		employee: employeeResource.data.name,
+		date: dayjs().format("YYYY-MM-DD"),
+	},
+	auto: true,
+	cache: "hrms:half_day_quota",
+	transform: (data) => {
+		if (!data) {
+			return null
+		}
+		return Object.fromEntries(
+			Object.entries(data).map(([half_day_type, allocation]) => {
+				allocation.balance_percentage =
+					(allocation.balance_leaves / allocation.allocated_leaves) * 100
+				return [half_day_type, allocation]
+			})
+		)
+	},
+})
+
+export const getMergedLeaveBalance = (leaveBalanceData, myLWBalanceData, halfDayQuotaData) => {
+	let data = {}
+	if (leaveBalanceData) {
+		data = { ...data, ...leaveBalanceData }
+	}
+	if (myLWBalanceData) {
+		data = { ...data, ...myLWBalanceData }
+	}
+	if (halfDayQuotaData) {
+		data = { ...data, ...halfDayQuotaData }
+	}
+	return data
+}

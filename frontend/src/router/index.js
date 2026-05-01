@@ -6,6 +6,8 @@ import leaveRoutes from "./leaves"
 import claimRoutes from "./claims"
 import employeeAdvanceRoutes from "./advances"
 import salarySlipRoutes from "./salary_slips"
+import sundayHolidayWorkingRequestRoutes from "./sundayHolidayWorkingRequest"
+import remoteWorkRequestRoutes from "./remoteWorkRequest"
 
 const routes = [
 	{
@@ -45,6 +47,16 @@ const routes = [
 				name: "SalarySlipsDashboard",
 				component: () => import("@/views/salary_slip/Dashboard.vue"),
 			},
+			{
+				path: "/dashboard/sunday-holiday-working",
+				name: "SundayHolidayWorkingDashboard",
+				component: () => import("@/views/sundayHolidayWorkingRequest/Dashboard.vue"),
+			},
+			// {
+			// 	path: "/regularization",
+			// 	name: "RegularizationFormView",
+			// 	component: () => import("@/views/RegularizationFormView.vue"),
+			// },
 		],
 	},
 	{
@@ -72,11 +84,18 @@ const routes = [
 		name: "InvalidEmployee",
 		component: () => import("@/views/InvalidEmployee.vue"),
 	},
+	{
+		path: "/today-holidays",
+		name: "TodayHolidaysList",
+		component: () => import("@/views/holidays/TodayHolidaysList.vue"),
+	},
 	...attendanceRoutes,
 	...leaveRoutes,
 	...claimRoutes,
 	...employeeAdvanceRoutes,
 	...salarySlipRoutes,
+	...sundayHolidayWorkingRequestRoutes,
+	...remoteWorkRequestRoutes,
 ]
 
 const router = createRouter({

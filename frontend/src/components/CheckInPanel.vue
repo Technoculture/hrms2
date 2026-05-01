@@ -9,22 +9,21 @@
 				<span>{{ __("Last {0} was at {1}", [__(lastLogType), formatTimestamp(lastLog.time)]) }}</span>
 				<span class="whitespace-pre"> &middot; </span>
 				<router-link :to="{ name: 'EmployeeCheckinListView' }" v-slot="{ navigate }">
-					<span @click="navigate" class="underline">View List</span>
+					<span @click="navigate" class="underline font-bold">View List</span>
 				</router-link>
 			</div>
-			<Button
-				class="mt-4 mb-1 drop-shadow-sm py-5 text-base"
+			<button
+				:class="buttonClass"
 				id="open-checkin-modal"
 				@click="handleEmployeeCheckin"
+				class="w-full flex items-center justify-center gap-2 font-semibold rounded-md"
 			>
-				<template #prefix>
-					<FeatherIcon
-						:name="nextAction.action === 'IN' ? 'arrow-right-circle' : 'arrow-left-circle'"
-						class="w-4"
-					/>
-				</template>
+				<FeatherIcon
+					:name="nextAction.action === 'IN' ? 'arrow-right-circle' : 'arrow-left-circle'"
+					class="w-4"
+				/>
 				{{ nextAction.label }}
-			</Button>
+			</button>
 		</template>
 
 		<div v-else class="font-medium text-sm text-gray-500 mt-1.5">
@@ -40,19 +39,41 @@
 		:breakpoints="[0, 1]"
 	>
 		<div class="h-120 w-full flex flex-col items-center justify-center gap-5 p-4 mb-5">
-			<div class="flex flex-col gap-1.5 mt-2 items-center justify-center">
-				<div class="font-bold text-xl">
-					{{ dayjs(checkinTimestamp).format("hh:mm:ss a") }}
+			<div class="flex flex-row items-center justify-between w-full">
+				<div></div>
+				<div class="flex flex-col gap-1.5 mt-2 items-center justify-center">
+					<div class="font-bold text-xl">
+						{{ dayjs(checkinTimestamp).format("hh:mm:ss a") }}
+					</div>
+					<div class="font-medium text-gray-500 text-sm">
+						{{ dayjs().format("D MMM, YYYY") }}
+					</div>
 				</div>
-				<div class="font-medium text-gray-500 text-sm">
-					{{ dayjs().format("D MMM, YYYY") }}
-				</div>
+				<template v-if="settings.data?.allow_geolocation_tracking"">
+					<button 
+						@click="refreshLocation" 
+						class="pr-4 rounded-full hover:bg-gray-100"
+						title="Refresh location"
+					>
+						<FeatherIcon name="refresh-cw" stroke-width="4" class="w-4 h-4 text-gray-600" />
+					</button>
+				</template>
 			</div>
 
 			<template v-if="settings.data?.allow_geolocation_tracking">
-				<span v-if="locationStatus" class="font-medium text-gray-500 text-sm">
-					{{ locationStatus }}
-				</span>
+				<!-- <div class="flex flex-row items-center justify-between w-full">
+					<span></span> -->
+					<span v-if="locationStatus" class="font-medium text-gray-500 text-sm">
+						{{ locationStatus }}
+					</span>
+					<!-- <button 
+						@click="refreshLocation" 
+						class="p-2 rounded-full hover:bg-gray-100"
+						title="Refresh location"
+					>
+						<FeatherIcon name="refresh-cw" class="w-4 h-4 text-gray-600" />
+					</button> -->
+				<!-- </div> -->
 
 				<div class="rounded border-4 translate-z-0 block overflow-hidden w-full h-170">
 					<iframe
@@ -64,6 +85,7 @@
 						marginwidth="0"
 						style="border: 0"
 						:src="`https://maps.google.com/maps?q=${latitude},${longitude}&hl=en&z=15&amp;output=embed`"
+						:key="`map-${locationRefreshKey}`"
 					>
 					</iframe>
 				</div>
@@ -93,6 +115,7 @@ const checkinTimestamp = ref(null)
 const latitude = ref(0)
 const longitude = ref(0)
 const locationStatus = ref("")
+const locationRefreshKey = ref(0)
 const settings = createResource({
 	url: "hrms.api.get_hr_settings",
 	auto: true,
@@ -118,9 +141,21 @@ const lastLogType = computed(() => {
 })
 
 const nextAction = computed(() => {
-	return lastLog?.value?.log_type === "IN"
-		? { action: "OUT", label: __("Check Out") }
-		: { action: "IN", label: __("Check In") }
+	console.log("last log data", lastLog?.value?.time)
+	
+	// Check if last log is from today
+	const isToday = lastLog?.value?.time ? 
+		dayjs(lastLog.value.time).isSame(dayjs(), 'day') : false
+	
+	// If last log is from today, use normal logic
+	if (isToday) {
+		return lastLog?.value?.log_type === "IN"
+			? { action: "OUT", label: __("Check Out") }
+			: { action: "IN", label: __("Check In") }
+	} else {
+		// If last log is not from today, always return check in
+		return { action: "IN", label: __("Check In") }
+	}
 })
 
 function handleLocationSuccess(position) {
@@ -131,7 +166,17 @@ function handleLocationSuccess(position) {
 		__("Latitude: {0}°", [Number(latitude.value).toFixed(5)]),
 		__("Longitude: {0}°", [Number(longitude.value).toFixed(5)]),
 	].join(", ")
+	
+	// Increment key to force iframe refresh
+	locationRefreshKey.value++
 }
+const buttonClass = computed(() => {
+	const base = "mt-4 mb-1 drop-shadow-sm py-3 text-base"
+	const bg = nextAction.value.action === 'IN'
+		? "bg-green-500 hover:bg-green-600"
+		: "bg-red-500 hover:bg-red-700"
+	return `${base} ${bg}`
+})
 
 function handleLocationError(error) {
 	locationStatus.value = "Unable to retrieve your location"
@@ -145,6 +190,10 @@ const fetchLocation = () => {
 		locationStatus.value = __("Locating...")
 		navigator.geolocation.getCurrentPosition(handleLocationSuccess, handleLocationError)
 	}
+}
+
+const refreshLocation = () => {
+	fetchLocation()
 }
 
 const handleEmployeeCheckin = () => {

@@ -63,12 +63,12 @@ function updateRequestDetails(leaves, claims, shiftRequests, attendanceRequests)
 }
 
 function getSortedRequests(list) {
-	// return top 10 requests sorted by posting date
+	// return top 5 requests sorted by posting date
 	return list
 		.sort((a, b) => {
 			return new Date(b.creation) - new Date(a.creation)
 		})
-		.splice(0, 10)
+		.splice(0, 5)
 }
 
 onMounted(() => {

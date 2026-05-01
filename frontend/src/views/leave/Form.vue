@@ -48,6 +48,7 @@ const formFields = createResource({
 
 		return fields.map((field) => {
 			if (field.fieldname === "half_day_date") field.hidden = true
+			if (field.fieldname === "custom_half_day_session") field.hidden = true
 
 			if (field.fieldname === "posting_date") field.default = today
 
@@ -136,6 +137,8 @@ watch(
 	() => leaveApplication.value.leave_approver,
   	(newApprover) => {
 			const approverField = formFields.data.find(f => f.fieldname === "leave_approver")
+			if (!approverField?.documentList) return
+
 			const selected = approverField?.documentList?.find(opt => opt.value === newApprover)
 			leaveApplication.value.leave_approver_name = selected?.label?.split(" : ")[1] || ""
   }
@@ -150,6 +153,12 @@ function getFilteredFields(fields) {
 		"sb_other_details",
 		"salary_slip",
 		"letter_head",
+		// "leave_approver",
+		// "leave_approver_name",
+		// "section_break_7"
+		"l1_manager",
+		"custom_l1_manager",
+		"custom_reporting_manager_l1",
 	]
 
 	const employeeFields = [
@@ -164,7 +173,11 @@ function getFilteredFields(fields) {
 
 	if (!props.id) excludeFields.push(...employeeFields)
 
-	return fields.filter((field) => !excludeFields.includes(field.fieldname))
+	return fields.filter(
+		(field) =>
+			!excludeFields.includes(field.fieldname) &&
+			field.label?.trim().toLowerCase() !== "l1 manager"
+	)
 }
 
 function setFormReadOnly() {
@@ -228,10 +241,21 @@ function setHalfDayDate(half_day) {
 	const half_day_date = formFields.data.find(
 		(field) => field.fieldname === "half_day_date"
 	)
+	const half_day_session = formFields.data.find(
+		(field) => field.fieldname === "custom_half_day_session"
+	)
 	half_day_date.hidden = !half_day
 	half_day_date.reqd = half_day
 
-	if (!half_day) return
+	half_day_session.hidden = !half_day
+	half_day_session.reqd = half_day
+
+	if (!half_day) {
+		// Reset half day date and session when half day is unchecked
+		leaveApplication.value.half_day_date = null
+		leaveApplication.value.custom_half_day_session = null
+		return
+	}
 
 	if (leaveApplication.value.from_date === leaveApplication.value.to_date) {
 		leaveApplication.value.half_day_date = leaveApplication.value.from_date
@@ -252,6 +276,12 @@ function setLeaveApprovers(data) {
 	const leave_approver = formFields.data?.find(
 		(field) => field.fieldname === "leave_approver"
 	)
+	if (!leave_approver) {
+		leaveApplication.value.leave_approver = data?.leave_approver
+		leaveApplication.value.leave_approver_name = data?.leave_approver_name
+		return
+	}
+
 	leave_approver.reqd = data?.is_mandatory
 	leave_approver.documentList = data?.department_approvers.map((approver) => ({
 		label: approver.full_name

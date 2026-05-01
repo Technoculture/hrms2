@@ -5,13 +5,14 @@
 			:pageTitle="__('Employee Checkin History')"
 			:fields="EMPLOYEE_CHECKIN_FIELDS"
 			:filterConfig="FILTER_CONFIG"
+			clientSideGroupBy="time"
 		/>
 	</ion-page>
 </template>
 
 <script setup>
 import { IonPage } from "@ionic/vue"
-import ListView from "@/components/ListView.vue"
+import ListView from "@/components/CheckinListView.vue"
 import { inject } from "vue"
 
 const __ = inject("$translate")

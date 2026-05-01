@@ -23,6 +23,16 @@ export const LEAVE_FIELDS = [
 		fieldtype: "Check",
 	},
 	{
+		fieldname: "custom_half_day_session",
+		label: "Half Day Session",
+		fieldtype: "Select",
+	},
+	{
+		fieldname: "employee",
+		label: "Employee Code",
+		fieldtype: "Data",
+	},
+	{
 		fieldname: "half_day_date",
 		label: "Half Day Date",
 		fieldtype: "Date",
@@ -252,5 +262,48 @@ export const EMPLOYEE_CHECKIN_FIELDS = [
 		fieldname: "geolocation",
 		label: "Geolocation",
 		fieldtype: "geolocation",
+	},
+]
+
+export const SUNDAY_HOLIDAY_WORKING_REQUEST_FIELDS = [
+	{
+		fieldname: "name",
+		label: "ID",
+		fieldtype: "Data",
+	},
+	{
+		fieldname: "employee",
+		label: "Employee",
+		fieldtype: "Link",
+	},
+	{
+		fieldname: "employee_name",
+		label: "Employee Name",
+		fieldtype: "Data",
+	},
+	{
+		fieldname: "work_date",
+		label: "Work Date",
+		fieldtype: "Date",
+	},
+	{
+		fieldname: "work_date_formatted",
+		label: "Work Date",
+		fieldtype: "Data",
+	},
+	{
+		fieldname: "status",
+		label: "Status",
+		fieldtype: "Select",
+	},
+	{
+		fieldname: "work_description",
+		label: "Work Description",
+		fieldtype: "Long Text",
+	},
+	{
+		fieldname: "rejection_reason",
+		label: "Rejection Reason",
+		fieldtype: "Long Text",
 	},
 ]
