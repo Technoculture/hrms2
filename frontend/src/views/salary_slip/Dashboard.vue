@@ -3,22 +3,17 @@
 		<template #body>
 			<div class="flex flex-col items-center my-7 p-4">
 				<div class="flex flex-col w-full bg-white rounded py-5 px-3.5 gap-5">
-					<div v-if="lastSalarySlip" class="flex flex-col w-full gap-1.5">
+					<div v-if="canViewSalarySlips && lastSalarySlip" class="flex flex-col w-full gap-1.5">
 						<span class="text-gray-600 text-sm font-medium leading-5">
 							{{ __("Year To Date") }}
 						</span>
 						<span class="text-gray-800 text-xl font-bold leading-6">
-							{{
-								formatCurrency(
-									lastSalarySlip.year_to_date,
-									lastSalarySlip.currency
-								)
-							}}
+							{{ formatCurrency(lastSalarySlip.year_to_date, lastSalarySlip.currency) }}
 						</span>
 					</div>
 
 					<Autocomplete
-						v-if="payrollPeriods.data?.length"
+						v-if="canViewSalarySlips && payrollPeriods.data?.length"
 						:label="__('Payroll Period')"
 						class="w-full"
 						:placeholder="__('Select Payroll Period')"
@@ -29,7 +24,7 @@
 
 				<div class="flex flex-col items-center mt-5 mb-7 w-full">
 					<div
-						v-if="documents.data?.length"
+						v-if="canViewSalarySlips && documents.data?.length"
 						class="flex flex-col bg-white rounded mt-5 overflow-auto w-full"
 					>
 						<div
@@ -48,7 +43,14 @@
 							</router-link>
 						</div>
 					</div>
-					<EmptyState :message="__('No salary slips found')" v-else />
+					<EmptyState
+						:message="
+							canViewSalarySlips
+								? __('No salary slips found')
+								: __('Salary slips are not available')
+						"
+						v-else
+					/>
 				</div>
 			</div>
 		</template>
@@ -73,6 +75,12 @@ const dayjs = inject("$dayjs")
 const socket = inject("$socket")
 const __ = inject("$translate")
 
+const canViewSalarySlips = computed(
+	() =>
+		Boolean(employee.data?.custom_show_salary_slip) &&
+		Boolean(employee.data?.custom_show_salary_slips_after)
+)
+
 const payrollPeriods = createListResource({
 	doctype: "Payroll Period",
 	fields: ["name", "start_date", "end_date"],
@@ -92,22 +100,17 @@ const payrollPeriods = createListResource({
 	},
 	onSuccess: (data) => {
 		selectedPeriod.value = data?.[0] || null
+		if (!data?.length) reloadSalarySlips()
 	},
+	auto: false,
 })
 
 const documents = createListResource({
 	doctype: "Salary Slip",
-	fields: [
-		"name",
-		"start_date",
-		"end_date",
-		"currency",
-		"gross_pay",
-		"net_pay",
-		"year_to_date",
-	],
+	fields: ["name", "start_date", "end_date", "currency", "gross_pay", "net_pay", "year_to_date"],
 	filters: {
 		employee: employee.data?.name,
+		posting_date: [">", employee.data?.custom_show_salary_slips_after],
 		docstatus: ["!=", 2],
 	},
 	orFilters: [
@@ -115,37 +118,56 @@ const documents = createListResource({
 		["Salary Slip", "custom_last_sent", "is", "set"],
 	],
 	orderBy: "end_date desc",
-	auto: true,
+	auto: false,
 })
 
 const lastSalarySlip = computed(() => documents.data?.[0])
 
 function getPeriodLabel(period) {
-	return `${dayjs(period?.start_date).format("MMM YYYY")} - ${dayjs(
-		period?.end_date
-	).format("MMM YYYY")}`
+	return `${dayjs(period?.start_date).format("MMM YYYY")} - ${dayjs(period?.end_date).format(
+		"MMM YYYY"
+	)}`
 }
 
 watch(
 	() => selectedPeriod.value,
 	(value) => {
+		if (!canViewSalarySlips.value) return
+
 		let period = periodsByName.value[value?.value]
 		if (period?.start_date && period?.end_date) {
-			documents.filters.start_date = [
-				"between",
-				[period.start_date, period.end_date],
-			]
+			documents.filters.start_date = ["between", [period.start_date, period.end_date]]
 		} else {
 			delete documents.filters.start_date
 		}
-		documents.reload()
+		reloadSalarySlips()
 	}
 )
 
+watch(
+	() => canViewSalarySlips.value,
+	(value) => {
+		if (value) reloadDashboard()
+	},
+	{ immediate: true }
+)
+
+function reloadDashboard() {
+	documents.filters.employee = employee.data?.name
+	documents.filters.posting_date = [">", employee.data?.custom_show_salary_slips_after]
+	payrollPeriods.reload()
+}
+
+function reloadSalarySlips() {
+	documents.filters.employee = employee.data?.name
+	documents.filters.posting_date = [">", employee.data?.custom_show_salary_slips_after]
+	documents.reload()
+}
+
 onMounted(() => {
 	socket.on("hrms:update_salary_slips", (data) => {
-		if (data.employee === employee.data.name) {
-			documents.reload()
+		if (canViewSalarySlips.value && data.employee === employee.data.name) {
+			reloadSalarySlips()
 		}
 	})
 })

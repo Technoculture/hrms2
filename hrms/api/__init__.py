@@ -161,22 +161,79 @@ def get_current_user_info() -> dict:
 @frappe.whitelist()
 def get_current_employee_info() -> dict:
 	current_user = frappe.session.user
+	employee_fields = [
+		"name",
+		"first_name",
+		"employee_name",
+		"designation",
+		"department",
+		"company",
+		"reports_to",
+		"user_id",
+	]
+	employee_meta = frappe.get_meta("Employee")
+	if employee_meta.has_field("custom_show_salary_slip"):
+		employee_fields.append("custom_show_salary_slip")
+	if employee_meta.has_field("custom_show_salary_slips_after"):
+		employee_fields.append("custom_show_salary_slips_after")
+
 	employee = frappe.db.get_value(
 		"Employee",
 		{"user_id": current_user, "status": "Active"},
-		[
-			"name",
-			"first_name",
-			"employee_name",
-			"designation",
-			"department",
-			"company",
-			"reports_to",
-			"user_id",
-		],
+		employee_fields,
 		as_dict=True,
 	)
 	return employee
+
+
+def _get_salary_slip_access_settings() -> dict:
+	current_user = frappe.session.user
+	employee_meta = frappe.get_meta("Employee")
+
+	if not (
+		employee_meta.has_field("custom_show_salary_slip")
+		and employee_meta.has_field("custom_show_salary_slips_after")
+	):
+		return {}
+
+	return frappe.db.get_value(
+		"Employee",
+		{"user_id": current_user, "status": "Active"},
+		["name", "custom_show_salary_slip", "custom_show_salary_slips_after"],
+		as_dict=True,
+	) or {}
+
+
+def _can_access_salary_slip(name: str) -> bool:
+	employee = _get_salary_slip_access_settings()
+	if not (
+		employee
+		and employee.custom_show_salary_slip
+		and employee.custom_show_salary_slips_after
+	):
+		return False
+
+	salary_slip = frappe.db.get_value(
+		"Salary Slip",
+		name,
+		["employee", "posting_date", "docstatus", "custom_last_sent"],
+		as_dict=True,
+	)
+	if not salary_slip:
+		return False
+
+	return (
+		salary_slip.employee == employee.name
+		and salary_slip.docstatus != 2
+		and (salary_slip.docstatus == 1 or salary_slip.custom_last_sent)
+		and getdate(salary_slip.posting_date)
+		> getdate(employee.custom_show_salary_slips_after)
+	)
+
+
+@frappe.whitelist()
+def can_access_salary_slip(name: str) -> bool:
+	return _can_access_salary_slip(name)
 
 
 @frappe.whitelist()
@@ -1230,6 +1287,9 @@ def download_salary_slip(name: str):
 	import base64
 
 	from frappe.utils.print_format import download_pdf
+
+	if not _can_access_salary_slip(name):
+		frappe.throw(_("Not permitted to access this Salary Slip"), frappe.PermissionError)
 
 	default_print_format = frappe.get_meta("Salary Slip").default_print_format or "Standard"
 
