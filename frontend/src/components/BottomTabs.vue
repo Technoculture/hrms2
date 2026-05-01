@@ -40,7 +40,7 @@ const route = useRoute()
 
 const canViewSalarySlips = computed(
 	() =>
-		Boolean(employee.data?.custom_show_salary_slip) &&
+		Boolean(employee.data?.custom_show_salary_slips) &&
 		Boolean(employee.data?.custom_show_salary_slips_after)
 )
 

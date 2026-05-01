@@ -172,8 +172,8 @@ def get_current_employee_info() -> dict:
 		"user_id",
 	]
 	employee_meta = frappe.get_meta("Employee")
-	if employee_meta.has_field("custom_show_salary_slip"):
-		employee_fields.append("custom_show_salary_slip")
+	if employee_meta.has_field("custom_show_salary_slips"):
+		employee_fields.append("custom_show_salary_slips")
 	if employee_meta.has_field("custom_show_salary_slips_after"):
 		employee_fields.append("custom_show_salary_slips_after")
 
@@ -199,7 +199,7 @@ def _get_salary_slip_access_settings() -> dict:
 	return frappe.db.get_value(
 		"Employee",
 		{"user_id": current_user, "status": "Active"},
-		["name", "custom_show_salary_slip", "custom_show_salary_slips_after"],
+		["name", "custom_show_salary_slips", "custom_show_salary_slips_after"],
 		as_dict=True,
 	) or {}
 
@@ -208,7 +208,7 @@ def _can_access_salary_slip(name: str) -> bool:
 	employee = _get_salary_slip_access_settings()
 	if not (
 		employee
-		and employee.custom_show_salary_slip
+		and employee.custom_show_salary_slips
 		and employee.custom_show_salary_slips_after
 	):
 		return False
