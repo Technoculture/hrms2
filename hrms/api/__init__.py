@@ -191,7 +191,7 @@ def _get_salary_slip_access_settings() -> dict:
 	employee_meta = frappe.get_meta("Employee")
 
 	if not (
-		employee_meta.has_field("custom_show_salary_slip")
+		employee_meta.has_field("custom_show_salary_slips")
 		and employee_meta.has_field("custom_show_salary_slips_after")
 	):
 		return {}
